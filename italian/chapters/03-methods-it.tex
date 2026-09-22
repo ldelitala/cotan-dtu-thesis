@@ -1,0 +1,280 @@
+\chapter{Materiali e metodi}
+
+Questo capitolo documenta ogni scelta metodologica fatta in questa tesi. L'obiettivo è la trasparenza: un esperto dovrebbe poter leggere queste decisioni, comprenderne la motivazione e giudicare se farebbe scelte diverse. La riproducibilità richiede di documentare non solo ciò che è stato fatto, ma anche perché le alternative sono state scartate.
+
+\section{Strategia di selezione dei dataset}
+
+Il fondamento di qualsiasi analisi computazionale è una selezione appropriata dei dati. Dataset di qualità scadente o non pertinenti non possono essere risollevati da algoritmi sofisticati a valle. La strategia adottata ha dato priorità a tre criteri: biologia di riferimento nota, chimica di sequenziamento $3'$-biased (coerente con i vincoli reali) e numero di cellule sufficiente per la potenza statistica.
+
+\subsection*{Perché COTAN\_Datasets\_analysis?}
+
+Anziché cercare nel Gene Expression Omnibus (GEO)\defn{Gene Expression Omnibus (GEO)}{Il database pubblico NCBI dei dataset di espressione genica pubblicati. Conserva dati grezzi e processati per la ri-analisi.} in modo occasionale, si è partiti dalla collezione curata su \url{https://seriph78.github.io/COTAN_Datasets_analysis/}. Questa risorsa offre diversi vantaggi:
+
+\begin{itemize}
+    \item \textbf{Qualità già validata}: questi dataset sono stati usati nei lavori di riferimento originali di COTAN, il che conferma che funzionano con il framework e non contengono artefatti tecnici rilevanti.
+    \item \textbf{Verità di riferimento nota}: le miscele di linee cellulari\defn{Linea cellulare}{Una popolazione di cellule in crescita permanente derivata da un singolo donatore, usata come sistema sperimentale riproducibile con biologia nota (ad esempio le cellule A549 portano mutazioni KRAS).} hanno identità documentate, il che permette di verificare che il clustering recuperi la biologia attesa. Le linee costituenti portano alterazioni driver ben caratterizzate: A549 (KRAS\cite{meng2010kras}), HCC78/HTB178 (fusione ROS1\cite{davies2012identifying}), PC9 (EGFR\cite{simonetti2010detection}) e DV90 (HER2); le mutazioni attivanti di questi oncogeni agiscono da driver tumorali anche in assenza di amplificazione genica\cite{bose2013activating}. Il più ampio panorama del NSCLC con mutazione BRAF è passato in rassegna da McCoach et al.\ \cite{mccoach2020molecular}.
+    \item \textbf{Preprocessing standardizzato}: molti dataset includono barcode pubblicati per le cellule di alta qualità, riducendo il rischio di includere gocce di bassa qualità che confonderebbero l'analisi a valle.
+\end{itemize}
+
+
+Questa scelta scambia l'ampiezza (meno opzioni totali rispetto a una ricerca grezza su GEO) con l'affidabilità---un fattore critico quando si verifica se un algoritmo nuovo rilevi davvero segnale biologico anziché rumore tecnico.
+
+\subsection*{Requisito: dati di sequenziamento $3'$-biased}
+
+L'obiettivo è testare il rilevamento della DTU in condizioni realistiche, non ideali. Questo significa scegliere deliberatamente il problema più difficile:
+\begin{itemize}
+    \item \textbf{I protocolli full-length (SMART-seq2)} catturano trascritti interi, rendendo la distinzione tra isoforme relativamente immediata con strumenti standard.
+    \item \textbf{I metodi a goccia $3'$-biased (10x Genomics)} sequenziano solo le estremità dei trascritti, dove molti eventi di \gls{splicing} alternativo sono invisibili. Un risultato positivo in queste condizioni dimostrerebbe una robustezza reale.
+\end{itemize}
+
+Scegliendo dati $3'$-biased si stabilisce un limite inferiore alla capacità di rilevamento DTU di COTAN. Se il metodo funziona sotto questi vincoli, ha valore pratico per studi su larga scala in cui il costo impone il sequenziamento a goccia.
+
+\subsection*{Assenza di matrici di trascritti pubblicate}
+
+Durante la ricerca dei dataset è emerso un ostacolo critico: \textbf{non esistono matrici di conteggi pubbliche di scRNA-seq a livello di trascritto}. Non si tratta di una dimenticanza---riflette la pratica standard del campo:
+\begin{itemize}
+    \item La maggior parte delle pipeline (CellRanger\defn{CellRanger / Seurat}{Pipeline standard (10x CellRanger, Seurat) che quantificano e analizzano dati scRNA-seq, con impostazione predefinita sui conteggi a livello genico.}, il workflow raccomandato di Seurat) collassa ai conteggi genici per impostazione predefinita.
+    \item La quantificazione a livello di trascritto richiede passaggi computazionali aggiuntivi (pseudo-allineamento con Salmon/alevin-fry) che molti analisti saltano.
+    \item Anche quando l'analisi a livello di trascritto viene eseguita, i risultati sono tipicamente riaggregati ai geni prima della pubblicazione.
+\end{itemize}
+
+La conseguenza è che le matrici di trascritti devono essere costruite internamente a partire dai file FASTQ. Questo aggiunge un onere computazionale, ma offre anche il controllo completo sul processo di quantificazione---un vantaggio di riproducibilità, una volta documentato in modo adeguato.
+
+\section{Pipeline di costruzione della matrice di trascritti}
+
+Con i dati grezzi di sequenziamento a disposizione, la difficoltà successiva è scegliere gli strumenti e documentare le modifiche necessarie a un output a livello di trascritto.
+
+\subsection*{Scelta dello strumento: alevin-fry (simpleaf) e kallisto}
+
+Due pseudo-allineatori dominano la quantificazione trascrittomica a singola cellula:
+
+\begin{table}[htbp]
+    \centering
+    \caption{Confronto tra gli strumenti di pseudo-allineamento per scRNA-seq.}\label{tab:pseudoalign-tools}
+    \vspace{0.5em}
+    \small
+    \setlength{\tabcolsep}{3pt}
+    \begin{tabular}{lcc}
+        \toprule
+        & \textbf{kallisto | bustools} & \textbf{alevin-fry (simpleaf)} \\
+        \midrule
+        Gestione dei multi-mapping & Distribuzione uniforme & Assegnazione basata su EM \\
+        Accuratezza della deduplicazione UMI & Buona & Migliore (modellazione degli errori) \\
+        Velocità & Rapida ($\sim$10 min per campione) & Molto rapida ($\sim$5 min per campione) \\
+        Integrazione con nf-core & Disponibile ma meno comune & Supporto nativo dalla v4.2+ \\
+        \bottomrule
+    \end{tabular}
+\end{table}
+
+La scelta è ricaduta su alevin-fry (modalità \texttt{simpleaf}, parte di Salmon) per tre ragioni:
+
+\begin{enumerate}
+    \item \textbf{Gestione superiore degli UMI}: i dati a singola cellula usano gli Unique Molecular Identifier per correggere il bias di amplificazione PCR. Il modello di errore di alevin-fry distingue meglio gli UMI reali dagli errori di sequenziamento.
+    \item \textbf{Risoluzione dei multi-mapping}: i read compatibili con più trascritti vengono assegnati in modo probabilistico tramite Expectation-Maximization (EM), anziché ripartiti uniformemente. Questo preserva i segnali di abbondanza relativa per l'analisi a valle.
+    \item \textbf{Integrazione con nf-core}\defn{nf-core}{Un repository comunitario di pipeline di analisi Nextflow standardizzate e revisionate tra pari.}: la pipeline nf-core/scrnaseq (v4.2.0) supporta nativamente \texttt{simpleaf}, con meno complicazioni di configurazione rispetto alle alternative con kallisto.
+\end{enumerate}
+
+La scelta dell'algoritmo EM conta: è stata usata la modalità \texttt{parsimony-em}\defn{parsimony-em}{Una modalità EM che assegna ogni read multi-mappato al più piccolo insieme sufficiente di trascritti.}, che assegna i read multi-mappati all'insieme minimo di trascritti coerente con i dati osservati. Questo produce conteggi frazionari che devono essere arrotondati (si veda la Sezione~\ref{sec:modification-process}).
+
+\subsection*{Il processo di modifica (passaggi riproducibili)}\label{sec:modification-process}
+
+L'output standard di alevin-fry collassa a livello genico per impostazione predefinita tramite la mappatura trascritto-gene (t2g)\defn{Mappatura trascritto-gene (t2g)}{Un file che associa ogni trascritto al gene di appartenenza; sostituirlo con una mappatura identità impedisce il collasso a livello genico.}. Per estrarre i conteggi per trascritto sono stati modificati i file di indice prima dell'allineamento:
+
+\begin{enumerate}
+    \item \textbf{Sostituzione di \texttt{t2g.txt} con una mappatura identità}:
+{\small\begin{verbatim}
+# Originale: ENSMUST00000193814  ENSMUSG00000067548  # gene
+# Modificato: ENSMUST00000193814  ENSMUST00000193814  # se stesso
+\end{verbatim}}
+    Questo impedisce il passaggio finale di aggregazione che somma le isoforme nei geni.
+    
+    \item \textbf{Rimozione di \texttt{gene\_id\_to\_names.txt}}: la pipeline nf-core si aspetta questo file per l'annotazione. Eliminarlo provoca un'uscita controllata nella fase di annotazione, dopo che i conteggi per trascritto sono già stati scritti su disco e possono essere recuperati.
+    
+    \item \textbf{Esecuzione di \texttt{parsimony-em} con arrotondamento}: l'EM produce assegnazioni frazionarie (ad esempio isoforma A: 12,7 read, isoforma B: 3,4 read). Poiché COTAN richiede conteggi interi, si arrotonda all'intero più vicino. Questo preserva i conteggi UMI totali mantenendo le proporzioni relative tra isoforme.
+\end{enumerate}
+
+Questa modifica è \textbf{reversibile}: ripristinando i file di indice standard si torna alla quantificazione a livello genico senza rieseguire l'allineamento. Aggiunge un onere computazionale minimo (la modifica dell'indice richiede secondi) e consente un output a risoluzione di trascritto da una pipeline pensata per i geni.
+
+\subsection*{Pipeline Nextflow personalizzata}
+
+Per rendere questo workflow riproducibile su dataset diversi, esso è stato automatizzato con \textbf{Nextflow}, un linguaggio domain-specific per pipeline computazionali che gestisce parallelizzazione e checkpointing. È stata incapsulata nf-core/scrnaseq (v4.2.0), una pipeline di analisi scRNA-seq mantenuta dalla comunità con supporto integrato per Salmon/simpleaf. Questa scelta fornisce gestione degli errori, dipendenze containerizzate e configurazione standard su tutti i dataset.
+
+Lo script di automazione personalizzato:
+
+\begin{itemize}
+    \item \textbf{Input}: un elenco di accession SRR\defn{Sequence Read Archive (SRA)}{Il repository NCBI dei dati grezzi di sequenziamento, accessibile tramite identificatori come le accession SRR.} e un riferimento genomico (FASTA e GTF\defn{GTF (Gene Transfer Format)}{Un file di annotazione che elenca le coordinate di ogni gene, la struttura degli esoni e i confini dei trascritti; usato per costruire l'indice del trascrittoma.}).
+    \item \textbf{Passaggi automatizzati}:
+    \begin{enumerate}
+        \item Download dei file FASTQ tramite \texttt{sra-tools}.
+        \item Costruzione o riuso dell'indice del trascrittoma con \texttt{salmon}.
+        \item Applicazione della modifica a \texttt{t2g.txt} se è richiesto l'output a livello di trascritto.
+        \item Esecuzione di nf-core/scrnaseq (v4.2.0) con \texttt{simpleaf}.
+        \item Formattazione degli output per l'ingestione in COTAN (matrice e metadati).
+    \end{enumerate}
+
+    \item \textbf{Repository GitHub}: \url{https://github.com/TODO/GITHUB_LINK}. La pipeline include documentazione, file di configurazione di esempio e casi di test.
+\end{itemize}
+
+Questa automazione riduce l'analisi da un processo manuale di più giorni a una singola invocazione da riga di comando. Chi lavorerà in futuro può applicarla a nuovi dataset senza reimplementare il workflow.
+
+
+
+\section{Scelte di filtraggio dei dati}
+
+Le matrici di conteggi grezze contengono rumore che deve essere rimosso prima dell'analisi statistica. La strategia di filtraggio privilegia il segnale biologico rispetto alla massimizzazione del numero di cellule, accettando dataset finali più piccoli ma di qualità superiore.
+
+\subsection*{Filtri a livello di cellula}
+
+Le cellule sono state filtrate usando i metadati delle pubblicazioni GEO originali:
+
+\begin{itemize}
+    \item \textbf{Corrispondenza dei barcode con gli insiemi di alta qualità pubblicati}: il dataset Arigoni (GSE243665) e il dataset Ding (GSE132044\cite{ding2020systematic}) forniscono entrambi elenchi di cellule che hanno superato le loro soglie di controllo qualità. Restringendo l'analisi a questi barcode noti come validi si evita di implementare una pipeline di controllo qualità propria, che potrebbe introdurre incoerenze.
+    \item \textbf{Motivazione}: gli studi pubblicati filtrano tipicamente per:
+    \begin{itemize}
+        \item Conteggio minimo di UMI per cellula (rimuove le gocce vuote).
+        \item Percentuale massima di read mitocondriali\defn{Percentuale di read mitocondriali}{La frazione dei read di una cellula proveniente da geni mitocondriali; valori anormalmente alti segnalano cellule morenti o danneggiate.} (rimuove le cellule morenti).
+        \item Soglie di rilevazione genica (cellule con troppo pochi geni possono essere doppietti\defn{Doppietto}{Due cellule catturate accidentalmente nella stessa goccia, che producono un segnale misto simile a una singola cellula anomala.} o di bassa qualità).
+    \end{itemize}
+    Riutilizzare il loro filtraggio garantisce confrontabilità e riduce la deriva metodologica.
+\end{itemize}
+
+
+Conteggi finali di cellule: 29.000 umane (Arigoni), 4.000 murine (Ding).
+
+\subsection*{Filtri a livello di feature}
+
+Le matrici di trascritti contengono molte feature che aggiungono rumore senza segnale:
+
+\begin{enumerate}
+    \item \textbf{Rimozione dei trascritti non spliced}\defn{Pre-mRNA non spliced}{RNA nascente che contiene ancora gli introni e non è stato ancora processato in mRNA maturo. Viene filtrato perché COTAN è pensato per trascritti maturi e spliced.}: il framework di COTAN è stato progettato per mRNA maturo. Il pre-mRNA non spliced (trascrizione nascente) ha proprietà statistiche diverse e può confondere l'analisi di co-espressione. Il filtraggio ha conservato solo le feature spliced, riducendo la dimensionalità della matrice.
+    \item \textbf{Soglia per isoforme ultra-rare}: i trascritti rilevati in meno di 3 cellule sull'intero dataset contribuiscono quasi solo zeri alle \glspl{contingencyTable}. Queste feature sparse aumentano il costo computazionale senza migliorare la potenza statistica. Rimuoverle riduce i falsi positivi da associazioni spurie.
+    \item \textbf{Dimensioni finali della matrice}:
+    \begin{itemize}
+        \item Umano: 29.000 cellule $\times$ 23.000 trascritti (dopo il filtraggio).
+        \item Topo: 4.000 cellule $\times$ 12.000 trascritti.
+    \end{itemize}
+\end{enumerate}
+
+Queste scelte privilegiano la qualità rispetto alla quantità. Matrici più piccole significano calcolo più rapido e segnale più pulito---un fattore critico quando si eseguono costosi calcoli su tabelle di contingenza per tutte le coppie di feature.
+
+\section{Strategia di clustering e validazione}
+
+Una domanda centrale di questa tesi è se i dati a livello di trascritto catturino una struttura cellulare che l'analisi a livello genico manca. Per rispondere, è stata implementata una strategia di clustering in tre parti: analisi principale sui trascritti, validazione contro baseline a livello genico e confronto del rilevamento DTU tra i due approcci.
+
+\subsection*{Clustering a livello di trascritto (analisi principale)}
+
+L'analisi principale raggruppa le cellule usando la matrice di conteggi per trascritto:
+
+\begin{itemize}
+    \item \textbf{Algoritmo}\defn{Clustering gerarchico uniforme}{La procedura di COTAN che suddivide ricorsivamente le cellule per dissimilarità di co-espressione, poi unisce i cluster statisticamente indistinguibili.}: il clustering gerarchico uniforme di COTAN.
+    \item \textbf{Procedura}:
+    \begin{enumerate}
+        \item Calcolo della dissimilarità tra cellule a partire dai pattern di co-espressione.
+        \item Suddivisione ricorsiva dei cluster fino a gruppi omogenei (nessuna ulteriore struttura significativa).
+        \item Unione dei cluster adiacenti statisticamente indistinguibili.
+    \end{enumerate}
+    \item \textbf{Output per il dataset murino}: 11 cluster uniformi più un piccolo residuo rumoroso.
+\end{itemize}
+
+Questo clustering rappresenta l'ipotesi di lavoro: se i dati a livello di trascritto catturano una struttura biologica significativa, questi cluster dovrebbero corrispondere a tipi o stati cellulari noti (nei dataset con verità di riferimento) o rivelare una sottostruttura interpretabile (nell'analisi esplorativa).
+
+\subsection*{Clustering a livello genico (baseline di validazione)}
+
+Per valutare se il clustering sui trascritti aggiunga valore rispetto agli approcci standard, le stesse cellule sono state raggruppate in modo indipendente usando i conteggi genici:
+
+\begin{itemize}
+    \item \textbf{Fonte dei dati}: matrice ufficiale di conteggi genici da GEO per il dataset Ding (4.000 cellule $\times$ 28.000 geni).
+    \item \textbf{Elaborazione}: applicazione della funzione standard \texttt{clean()} di COTAN per rimuovere le feature di bassa qualità.
+    \item \textbf{Output}: 15 cluster con parametri di clustering identici a quelli dell'analisi sui trascritti.
+\end{itemize}
+
+Questa baseline risponde a una domanda: aggregare i trascritti nei geni perde informazione che incide sull'assegnazione ai cluster? Se i due approcci producono risultati simili, l'analisi a livello genico è sufficiente. Se divergono in modo significativo, i dati a livello di trascritto catturano qualcosa di unico.
+
+\subsection*{Approccio di confronto}
+
+Le due strategie di clustering sono state confrontate lungo tre direttrici:
+
+\begin{enumerate}
+    \item \textbf{Matrice di confusione}\defn{Matrice di confusione}{Una tabella di accordo tra le etichette di cluster di due esecuzioni di clustering, che rivela suddivisioni e fusioni sistematiche.}: incrocio delle assegnazioni di cluster per tutte le 4.077 cellule comuni. Una sovrapposizione elevata suggerisce che entrambi i metodi catturano una struttura simile; suddivisioni o fusioni sistematiche rivelano dove divergono.
+    \item \textbf{Riesecuzione della DTU con etichette scambiate}: applicazione dell'algoritmo di rilevamento DTU ai dati a livello di trascritto usando come verità di riferimento le assegnazioni di cluster derivate dai geni. Questo verifica se i segnali DTU siano robusti rispetto a come le cellule vengono partizionate, o se dipendano interamente dalla risoluzione del clustering.
+    \item \textbf{Analisi della sovrapposizione degli eventi}: confronto di quali geni o trascritti ciascun approccio identifica come DTU-positivi:
+    \begin{itemize}
+        \item Eventi condivisi: segnali robusti che sopravvivono a entrambi i clustering.
+        \item Esclusivi dei trascritti: switch sottili che richiedono una partizione a grana fine.
+        \item Esclusivi dei geni: segnali più deboli che richiedono potenza statistica aggregata.
+    \end{itemize}
+\end{enumerate}
+
+Questo confronto a più livelli va oltre la domanda su quale clustering sia corretto e ne pone una più sfumata: che cosa rivela ciascun approccio, e quando un ricercatore dovrebbe preferirne uno all'altro?
+
+\subsection*{Motivazione della strategia in tre parti}
+
+Il disegno di validazione affronta tre questioni distinte:
+
+\begin{itemize}
+    \item \textbf{Validità biologica}: i cluster corrispondono a tipi cellulari significativi (verificati tramite geni marcatore e biologia nota)?
+    \item \textbf{Contributo metodologico}: l'analisi a livello di trascritto aggiunge valore rispetto agli approcci standard a livello genico? In caso contrario, la complessità aggiuntiva non è giustificata.
+    \item \textbf{Robustezza delle chiamate DTU}: gli switch di isoforma rilevati sono stabili tra strategie di clustering, o rappresentano artefatti di uno specifico schema di partizione?
+\end{itemize}
+
+Affrontando tutte e tre le questioni si stabilisce se COTAN a livello di trascritto non sia solo fattibile, ma genuinamente utile per il rilevamento della DTU.
+
+\section{Algoritmo di rilevamento della DTU}\label{sec:methods-dtu-algorithm}
+
+Il contributo centrale di questa tesi è un algoritmo che identifica eventi di uso differenziale dei trascritti a partire da dati sparsi a singola cellula usando il framework statistico di COTAN. Ogni passaggio ha una giustificazione biologica e statistica esplicita.
+
+\subsection*{Procedura passo per passo}
+
+Per ogni gene con $k \ge 2$ isoforme rilevate:
+
+\begin{enumerate}
+    \item \textbf{Screening di esclusività reciproca}: per ogni possibile coppia di isoforme $(A, B)$ all'interno del gene:
+    \begin{itemize}
+        \item Calcolo del punteggio di co-espressione (\textit{coex}) da \glspl{contingencyTable} $2 \times 2$ (presenza e assenza nelle cellule).
+        \item Filtro per \textit{coex} negativa con $p$-value\defn{p-value}{La probabilità di osservare un'associazione così forte se le feature fossero davvero indipendenti.} $< 0.05$.
+        \item Motivazione: l'esclusività reciproca indica \gls{splicing} alternativo o \gls{isoformSwitch}.
+    \end{itemize}
+    
+    \item \textbf{Calcolo del contrasto}: per ogni coppia significativa, calcolo dei vettori di arricchimento differenziale:
+    \begin{equation}
+        \Delta_{\text{cluster}} = \text{DEA}_A(\text{cluster}) - \text{DEA}_B(\text{cluster}),
+    \end{equation}
+    dove $\text{DEA}$ è l'analisi dell'espressione differenziale di COTAN. Per un gene $i$ e un sottoinsieme di cellule $C$, la DEA costruisce una tabella di contingenza $2 \times 2$ contando le cellule dentro e fuori $C$ in cui il gene $i$ è presente o assente, poi calcola un coefficiente di correlazione $D_{i,C} \in (-1, 1)$ che misura l'arricchimento (positivo) o l'impoverimento (negativo). Questo intervallo di valori consente un confronto diretto delle dimensioni dell'effetto tra geni e cluster.
+    
+    \item \textbf{Soglia}: conservare le coppie che mostrano switch di isoforma:
+    \begin{itemize}
+        \item Almeno un cluster con $\Delta > \tau$.
+        \item Almeno un cluster con $\Delta < -\tau$.
+        \item Soglie:\defn{$\tau$ (soglia di contrasto)}{Il contrasto DEA assoluto minimo tra due isoforme richiesto perché un cluster contribuisca a uno switch.} $\tau = 0.2$ (umano, linee cellulari ben definite), $\tau = 0.05$ (topo, differenziazione continua).
+    \end{itemize}
+    Motivazione: gli eventi DTU reali dovrebbero mostrare preferenze opposte tra le isoforme nelle diverse condizioni, non soltanto un arricchimento unilaterale.
+\end{enumerate}
+
+L'algoritmo restituisce un elenco di coppie gene-isoforma con evidenza di uso differenziale specifico per cluster, ordinato per significatività statistica e dimensione dell'effetto ($|\Delta|$).
+
+\subsection*{Giustificazione biologica di ogni passaggio}
+
+Perché questo approccio rileva una DTU reale anziché artefatti tecnici? La catena logica è la seguente:
+
+\begin{enumerate}
+    \item L'esclusività reciproca (\textit{coex} negativa) esclude la co-espressione dovuta a regolazione condivisa (ad esempio entrambe le isoforme elevate nello stesso tipo cellulare).
+    \item I $p$-value significativi controllano il tasso di falsi positivi. Con l'approssimazione asintotica chi-quadro di COTAN su migliaia di cellule, questi valori sono ben calibrati.
+    \item La soglia sul contrasto ($\tau$) assicura la rilevanza biologica: si cercano switch di isoforma in cui $A$ domina in alcune condizioni mentre $B$ domina in altre---non semplici fluttuazioni casuali attorno a un uso uguale.
+\end{enumerate}
+
+L'intuizione chiave: combinando lo screening di \gls{mutualExclusivity} con requisiti di contrasto bidirezionale, l'algoritmo seleziona pattern coerenti con un reale splicing alternativo anziché con il rumore o un bias tecnico.
+
+\section{Taratura del parametro di soglia \texorpdfstring{$\tau$}{tau}}\label{sec:tuning-tau}
+
+Il parametro di soglia $\tau$ controlla il compromesso tra sensibilità e specificità nel rilevamento della DTU: valori alti producono poche chiamate sicure ma rischiano di perdere switch sottili; valori bassi catturano più eventi ma aumentano i falsi positivi.
+
+È stato sviluppato uno script di taratura (su richiesta della relatrice, Prof.\ Silvia Galfr\'e) che:
+
+\begin{itemize}
+    \item Varia $\tau$ su un intervallo (ad esempio da $0.01$ a $0.5$).
+    \item Conta gli eventi DTU rilevati a ciascuna soglia.
+    \item Traccia la relazione tra $\tau$ e il numero di coppie significative.
+    \item Suggerisce soglie che producano un numero di candidati biologicamente ragionevole (tipicamente $20$--$100$ eventi, per una validazione realizzabile).
+\end{itemize}
+
+Lo script è incluso nel repository GitHub insieme alla pipeline principale. I risultati di questa taratura hanno guidato la scelta di $\tau = 0.2$ per i dati umani (linee cellulari ben separate, segnali più forti) e di $\tau = 0.05$ per il tessuto cerebrale murino (traiettoria di differenziazione continua, transizioni più sottili).

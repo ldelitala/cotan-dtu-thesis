@@ -1,0 +1,150 @@
+\chapter{Introduction}
+
+\section{Context and Motivation}
+In single-cell RNA sequencing (scRNA-seq), standard Differential Expression (DE) analysis focuses on gene-level totals. However, many genes can produce multiple distinct proteins through different transcripts or isoforms. Differential Transcript Usage (DTU) investigates whether the proportions of these isoforms change between conditions, cell types, or along a trajectory, even if the overall gene expression remains constant. Recovering DTU from scRNA-seq is notoriously challenging because the data is sparse and often 3'-biased (droplet assays capture predominantly transcript ends).
+
+\section{The COTAN Framework}
+To tackle the sparsity and noise of scRNA-seq, COTAN \cite{galfre2026gene, galfre2021cotan} models single-cell data using contingency tables that focus on the presence or absence (zeros) of gene reads rather than log-normalized counts. This approach avoids imputation and log-scaling, naturally handles UMI droplet sparsity, and yields a robust gene-gene co-expression (coex) matrix. Furthermore, COTAN provides a Differential Expression Analysis (DEA) test for enrichment and the Global Differentiation Index (GDI) to evaluate cluster homogeneity. Benchmarks demonstrate that COTAN yields fewer false positives in DEA and achieves stronger marker recovery—especially for low-expression genes—compared to standard tools like Seurat, Scanpy, or Monocle. 
+
+These characteristics make COTAN an ideal candidate for probing isoform switches. Since mutually exclusive transcript usage within a gene is inherently subtle and sparse, COTAN's ability to estimate co-activation and exclusivity from $2 \times 2$ tables, while explicitly modeling cell library size and zero probabilities, reduces the spurious correlations that typically plague sparse data.
+
+\section{Thesis Objectives}
+The primary goal of this thesis is to build an isoform-level scRNA-seq workflow, run COTAN at transcript resolution, and test whether COTAN's independence and association statistics can robustly recover within-gene exclusivity patterns indicative of DTU. 
+Specifically, the objectives are:
+\begin{itemize}
+    \item To adapt standard pseudo-alignment pipelines to output transcript-level quantification from 3'-biased 10x data.
+    \item To perform transcript-level COTAN analysis, evaluating transcript-pair co-expression where strong negative associations across cells suggest mutual exclusivity.
+    \item To validate the findings by comparing transcript-level clustering against standard gene-level clustering baselines.
+\end{itemize}
+
+\chapter{Materials and Methods}
+
+\section{Dataset Selection}
+To perform transcript-level analysis, 3'-biased sequencing datasets were required. Initial attempts included the SPLiT-seq Brain\_Morabito 2021 dataset (GSE189033); however, it was discarded as the SPLiT technology requires the proprietary Parse Biosciences Evercode ecosystem incompatible with our pipeline.
+
+\subsection*{The 3'-Bias Challenge for Isoform Resolution}
+The fundamental constraint of droplet-based scRNA-seq is that alternative splicing events frequently occur in the \textit{5'} portion of transcripts while the 3' untranslated region remains shared. For example, a gene may have two isoforms differing by alternative first exons (alternative transcription start sites) or internal exon skipping, yet both variants terminate at identical polyadenylation sites:
+\begin{itemize}
+    \item A full-length protocol (e.g., SMART-seq2) sequences the entire transcript length, capturing exon-exon junctions unique to each isoform.
+    \item A 3'-biased droplet assay counts only reads near the poly-A tail. Since both isoforms share this region, their fragment libraries are indistinguishable by alignment alone.
+\end{itemize}
+The consequence: apparent transcript-level quantification from 10x data may reflect technical noise in EM assignment rather than genuine biological signal. Isoform switches detectable under these constraints tend to be those where the alternative isoforms \textit{do} differ at their 3' ends (alternative polyadenylation, terminal exon choice) or have sufficient internal junction coverage from overlapping reads.
+
+This limitation informed our dataset selection: we prioritized cell line mixtures with known biology and mouse brain tissue where long non-coding RNAs (known for alternative isoform usage) are abundant. Subsequently, 10x Genomics datasets were evaluated. The 10x v1 chemistry was excluded due to its unsupported read geometry for our pipeline. 
+
+The final analysis was conducted on two robust datasets:
+\begin{itemize}
+    \item \textbf{Arrigoni 2024 (GSE243665):} A 10x v3 dataset containing a mixture of known human cell lines. Samples SRR26127904 to SRR26127911 were processed as a single dataset. (providing a controlled heterogeneity environment using lung cancer cell lines characterised by expressing seven different driver genes (EGFR, ALK, MET, ERBB2, KRAS, BRAF, ROS1), which are characterised by the presence of partial overlaps in their functional pathways. Furthermore, PBMC from a healthy donor were also sequenced
+ 	
+Overall design	PC9 (EGFR Del19, activating mutation, PMID: 21167064; A549 (KRAS p.G12S, growth and proliferation, PMID: 20358631; NCI-H596 (HTB178, MET Del14 , enhanced protection from apoptosis and cellular migration PMID: 35636967; NCI-H1395 (CRL5868, BRAF p.G469A, gain of function, resistant to all tested MEK +/- BRAF inhibitors, PMID: 32540409; DV90 (ERBB2 p.V842I, increases kinase activity, PMID: 23220880; HCC78 (SLC34A2-ROS1 Fusion, ROS1 inhibitors have antiproliferative effect PMID: 22919003; CCL.185.IG (EML4-ALK Fusion-A549 Isogenic Cell, https://www.atcc.org/products/ccl-185ig); White cell from donor buffy coat (PBMC). All cell lines were purchased and cultured as suggested by the manufacturer. scRNA-seq was done using 10XGenomics platform.)
+    \item \textbf{Ding 2020 (GSE132044):} A 10x v2 dataset of a mouse brain. The most reliable sample, \textit{Cortex 2} (8 SRRs), was selected for the analysis.
+\end{itemize}
+
+\section{Transcript-Level Quantification Workflow}
+Since standard 3'-scRNA-seq pipelines are optimized for gene-level counts, extracting a transcript-level count matrix required a custom approach. We utilized the \texttt{nf-core/scrnaseq} (v4.2.0) pipeline, opting for \textit{simpleaf} (based on \textit{alevin-fry}) over \textit{kallisto} due to its superior handling of multi-mapped reads and UMI deduplication—crucial features for accurate isoform-level quantification.
+
+\subsection{Methodological Adaptation (The \textit{simpleaf} Hack)}
+To force \textit{simpleaf} to output transcript-level rather than gene-level matrices, the genome index was modified prior to alignment:
+\begin{enumerate}
+    \item The transcript-to-gene (\texttt{t2g.txt}) mapping file was replaced with an identity matrix (transcript-to-transcript). This prevents the algorithm from collapsing transcript-level reads into gene-level counts.
+    \item The \texttt{gene\_id\_to\_names.txt} file was removed from the index to bypass the final pipeline step that would otherwise crash due to the missing gene IDs.
+    \item The Expectation-Maximization (EM) algorithm used was \textit{parsimony-em}. Since COTAN requires integer counts, the resulting non-integer matrices were rounded to the nearest integer.
+\end{enumerate}
+
+\subsection{Custom Automation Pipeline}
+To standardize this workflow, a custom Nextflow pipeline was developed. Given a list of SRRs and genome data, the pipeline automates the downloading of FASTQs, the downloading and building of the index, the optional modification of the index for transcript-level generation, and the execution of \texttt{nf-core/scrnaseq}. Additionally, custom R libraries were written to streamline subsequent COTAN operations.
+
+\section{Data Preprocessing and COTAN Initialization}
+
+\subsection{Human Dataset (Arrigoni)}
+Using the Ensembl human reference (GRCh38, release 102), the initial matrix contained 619k cells and 308k features (spliced + unspliced). After filtering out unspliced features, 232k transcripts remained. Valid cells were selected by matching barcodes with the high-quality cells published on GEO, retaining approximately 29k cells. After adding gene IDs/names and applying the standard COTAN \texttt{clean()} function, the final matrix comprised $\sim$29k cells and 23k transcripts. Differential Expression Analysis (DEA) was computed using the predefined cell line clusters (e.g., A549, CCL-185-IG, etc.).
+
+\subsection{Mouse Dataset (Ding)}
+Using the Ensembl mouse reference (GRCm39, release 109), the initial matrix yielded 215k cells and 222k features. Filtering for spliced transcripts reduced this to 150k features. Valid cells were filtered using GEO metadata, leaving 4k cells. Following the COTAN \texttt{clean()} step, the matrix finalized at 4k cells and 12k features. 
+
+For this dataset, clustering was performed \textit{de novo} using COTAN's \texttt{cellsUniformClustering} and \texttt{mergeUniformCellsClusters}, identifying 11 uniform clusters (plus a few noisy cells). DEA was calculated across these 11 clusters. *this part misses the explanation on the two clustering, the one on gene level and the one on transcript level matrix
+
+\section{DTU Detection Algorithm}
+To identify Differential Transcript Usage (DTU) events, a custom algorithm was applied to the COTAN objects:
+\begin{enumerate}
+    \item \textbf{Gene filtering:} Selected only genes with at least 2 detected isoforms.
+    \item \textbf{Mutual Exclusivity:} For every possible pair of isoforms (A and B) within a gene, the algorithm filtered for a negative COEX score with a significant p-value ($p < 0.05$).
+    \item \textbf{Contrast Calculation:} The DEA vectors of isoform A and B were compared by calculating the difference ($\Delta = DEA_A - DEA_B$). Positive values indicate higher expression of A; negative values indicate higher expression of B.
+    \item \textbf{Thresholding:} Pairs were kept if they exhibited at least one cluster with $\Delta > \tau$ and one cluster with $\Delta < -\tau$. The threshold $\tau$ was set to 0.2 for the human dataset and 0.05 for the mouse dataset to obtain a biologically reasonable number of candidates. * This was treated kind of like an hyperparameter where i would find the value with the adequate number of results. I think the much higher value of the human dataset is because the cell clusters where well defined and known.
+\end{enumerate}
+
+
+\chapter{Preliminary Results and Validation}
+
+\section{DTU Discovery}
+\textbf{Human Dataset (Arrigoni):} The algorithm evaluated 4,958 genes with multiple transcripts. Of these, 430 genes contained at least one significantly mutually exclusive isoform pair. After the contrast thresholding ($\Delta = 0.2$), 21 DTU pairs across 9 genes were successfully identified (e.g., TPM1, RPL10, RPS24). 
+
+\textbf{Mouse Dataset (Ding - Transcript clustering):} The algorithm evaluated 2,122 genes. 14 genes contained significant pairs, and applying the contrast threshold ($\Delta = 0.05$) yielded 46 DTU pairs across 8 genes (e.g., Meg3, Malat1, Srrm2).
+
+\begin{figure}[htpb]
+    \centering
+    \includegraphics[width=0.8\textwidth]{GDI_transcript_plot_markers.png}
+    \caption{GDI plot of Transcript Mouse Dataset.}
+    \label{fig:confusion_matrix}
+\end{figure}
+
+\section{Validation: Transcript-level vs Gene-level Clustering}
+To assess the reliability of clustering performed directly on transcript-level matrices, a validation step was performed on the Ding dataset. 
+The official gene-count matrix was downloaded from GEO (4k cells $\times$ 28k genes), cleaned in COTAN (18k genes remaining), and clustered, yielding 15 clusters.
+
+The DTU algorithm was then re-run on the transcript-level matrix, utilizing the DEA vectors derived from this \textit{gene-level} clustering. A confusion matrix comparing the transcript-derived clusters (11 clusters) and gene-derived clusters (15 clusters) across 4,077 common cells revealed a general overlap, but with significant differences in cluster resolution. Several transcript-level clusters were split or merged when compared to the gene-level annotations, indicating that isoform-level data captures distinct cellular substates.
+
+\begin{figure}[htpb]
+    \centering
+    \includegraphics[width=0.8\textwidth]{GDI_genes_plot_markers.png}
+    \caption{GDI plot of Gene Mouse Dataset.}
+    \label{fig:confusion_matrix}
+\end{figure}
+
+\begin{figure}[htpb]
+    \centering
+    \includegraphics[width=0.8\textwidth]{heatmap_genes_vs_transcripts.pdf}
+    \caption{Heatmap comparing transcript-level and gene-level clustering.}
+    \label{fig:confusion_matrix}
+\end{figure}
+
+When comparing the DTU events detected using the two clustering strategies, the results were highly consistent but not identical. While both approaches identified 46 significant DTU pairs, the exact composition varied:
+\begin{itemize}
+    \item \textbf{Shared Events:} The majority of the events were robustly detected by both methods (e.g., highly significant shifts in \textit{Meg3} and \textit{Malat1}).
+    \item \textbf{Transcript-Clustering Exclusive:} 3 DTU pairs (across \textit{Srrm2} and \textit{Ttc14}) were detected exclusively using the transcript-level clusters.
+    \item \textbf{Gene-Clustering Exclusive:} 4 DTU pairs (across \textit{Snrnp70}, \textit{Lrrc7}, \textit{Zfp941}, and a specific \textit{Meg3} pair) were detected exclusively when using the gene-level clusters.
+\end{itemize}
+
+\chapter{Discussion}
+
+\section{Key Findings}
+The application of COTAN to transcript-level quantification demonstrates that within-gene exclusivity patterns can be detected from sparse 3'-biased scRNA-seq data. The pipeline successfully identified DTU events in both human cell line mixtures and mouse brain tissue, with the strongest signals (e.g., \textit{Meg3}, \textit{Malat1}) aligning with known biology.
+
+The comparison between gene-level and transcript-level clustering revealed that isoform data captures cellular substructure invisible to aggregated counts. This is critical for DTU detection: accurate partitioning of heterogeneous cell populations directly impacts statistical power to detect subtle isoform switches.
+
+\section{Limitations}
+Several constraints temper the current results:
+
+\begin{itemize}
+    \item \textbf{3'-bias}: Droplet-based protocols capture predominantly transcript ends, limiting isoform resolution. Full-length methods (SMART-seq2) would provide more complete coverage but at lower throughput.
+    \item \textbf{Rounding EM assignments}: The parsimony-EM algorithm produces fractional counts; rounding to integers preserves total UMIs but may distort low-abundance isoforms.
+    \item \textbf{Threshold sensitivity}: The contrast threshold $\tau$ was tuned empirically rather than derived from a formal statistical model. A data-driven approach (e.g., permutation testing) would improve reproducibility.
+    \item \textbf{Lack of ground truth}: Without orthogonal validation (long-read sequencing or targeted assays), false positive rates remain estimated.
+\end{itemize}
+
+\section{Future Directions}
+The framework opens several avenues for extension:
+
+\begin{enumerate}
+    \item \textbf{Integration with long-read data}: Combining short-read depth with PacBio/Nanopore isoform annotation would anchor DTU calls in complete transcript sequences.
+    \item \textbf{Trajectory-aware analysis}: Along differentiation paths, DTU may occur continuously rather than between discrete clusters. Modeling isoform proportions as a function of pseudotime could reveal dynamic switching patterns.
+    \item \textbf{Extension to allele-specific expression}: COTAN's contingency table approach naturally extends to phased variants; detecting allele-biased isoform usage would connect regulatory genetics to splicing outcomes.
+    \item \textbf{Benchmarking against bulk DTU tools}: Comparisons with established methods (rMATS, SUPPA2, DRIMSeq) on pseudo-bulk aggregates would contextualize sensitivity and specificity.
+\end{enumerate}
+
+\chapter*{Conclusions}
+This thesis establishes that COTAN's sparsity-robust framework can be extended to transcript-level analysis, recovering within-gene exclusivity patterns indicative of Differential Transcript Usage. The key insight—that zero patterns carry reliable signal even in sparse data—transfers from gene co-expression to isoform mutual exclusivity.
+
+While strongest DTU signals emerge consistently across clustering strategies, subtle switches depend on fine-grained population structure captured only by transcript-level analysis. This suggests that as scRNA-seq datasets grow larger and deeper, isoform-aware methods will become increasingly powerful for uncovering post-transcriptional regulation in single cells.
+
+The pipeline developed here—combining modified alevin-fry quantification with COTAN's statistical framework—provides a foundation for future work. With orthogonal validation and integration of long-read data, transcript-level COTAN could reveal regulatory programs hidden to gene-centric analyses.

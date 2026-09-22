@@ -1,0 +1,7 @@
+# Nested git clone — never track from the workspace root
+pipeline/
+
+# Agent files — must never reach athena
+AGENTS.md
+PLAN.md
+plans/

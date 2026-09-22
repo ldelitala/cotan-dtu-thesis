@@ -1,0 +1,234 @@
+% Voci di glossario (definite nel preambolo per la modalità senza indice).
+% La prima occorrenza di ogni termine nel corpo usa \gls{<label>}, che rende il
+% termine e collega ipertestualmente al Glossario.
+\newglossaryentry{dtu}{
+  name={uso differenziale dei trascritti (DTU)},
+  first={uso differenziale dei trascritti (DTU)},
+  text={DTU},
+  description={Si ha uso differenziale dei trascritti quando l'espressione relativa di più trascritti dello stesso gene cambia tra condizioni diverse \cite{young2024dtu}. È indipendente dai cambiamenti di espressione totale del gene, quindi non viene catturato dall'analisi dell'espressione differenziale a livello genico e richiede una risoluzione a livello di trascritto per essere rilevato.}
+}
+
+\newglossaryentry{deg}{
+  name={espressione genica differenziale (DGE)},
+  first={espressione genica differenziale (DGE)},
+  text={DGE},
+  description={L'analisi delle differenze nell'espressione totale di un gene---la somma dell'espressione di tutte le sue isoforme---tra gruppi di campioni. Misura l'output genico complessivo ed è cieca ai cambiamenti nell'uso relativo delle singole isoforme, che sono invece catturati dall'uso differenziale dei trascritti.}
+}
+
+\newglossaryentry{threePrimeEnd}{
+  name={estremità 3'},
+  description={L'estremità terminale di una molecola di RNA in cui termina la trascrizione; nell'mRNA è il punto in cui viene aggiunta la coda poli-A. Nei protocolli 3'-biased la chimica di cattura è ancorata a questa estremità, quindi i read coprono solo il frammento terminale di ciascuna molecola anziché l'intero trascritto.}
+}
+
+\newglossaryentry{threePrime}{
+  name={sequenziamento 3'-biased},
+  first={sequenziamento 3'-biased},
+  text={3'-biased},
+  plural={3'-biased},
+  description={Una proprietà di alcuni protocolli di scRNA-seq (come 10x Genomics Chromium) in cui i read di sequenziamento derivano solo dal 3' terminale di ciascun trascritto. Poiché la qualità di lettura diminuisce con la distanza e la cattura è ancorata all'estremità 3' del trascritto, la copertura non si estende al corpo del trascritto, quindi le giunzioni di splicing interne non vengono mai osservate \cite{regan2022practical}.}
+}
+
+\newglossaryentry{isoformSwitch}{
+  name={switch di isoforma},
+  description={Un cambiamento, tra condizioni diverse, nell'uso relativo delle isoforme di un gene, per cui la frazione di espressione genica contribuita da una isoforma aumenta mentre quella di un'altra diminuisce. Riflette un'alterazione dello splicing alternativo o della trascrizione ed è quantificato dal cambiamento della frazione di espressione totale del gene attribuibile a ciascuna isoforma \cite{vitting2017isoformswitch}.}
+}
+
+\newglossaryentry{sparsity}{
+  name={sparsità},
+  description={La proporzione molto elevata di conteggi nulli nei dati di scRNA-seq.}
+}
+
+\newglossaryentry{dropout}{
+  name={dropout tecnico},
+  plural={dropout tecnici},
+  description={Un conteggio nullo prodotto da un limite tecnico del saggio---cattura, retrotrascrizione o sequenziamento falliti---anziché dall'assenza reale del trascritto. È anche descritto come zero non biologico.}
+}
+
+\newglossaryentry{zeroInflated}{
+  name={distribuzione zero-inflated},
+  plural={distribuzioni zero-inflated},
+  description={Un modello statistico per dati di conteggio che è una miscela di una massa puntuale in zero e di una distribuzione di conteggio standard (come Poisson o binomiale negativa). Si usa quando i dati contengono più zeri di quanti ne preveda la sola distribuzione di conteggio, trattando quegli zeri in eccesso come generati da un processo separato. Nello scRNA-seq il termine è stato applicato in modo incoerente, e il suo uso è dibattuto perché uno zero può riflettere un errore di misura o l'assenza reale di espressione \cite{sarkar2021separating}.}
+}
+
+% Nessun punto aggiuntivo tra una descrizione e il suo elenco di pagine.
+\renewcommand*{\glspostdescription}{}
+
+\newglossaryentry{countMatrix}{
+  name={matrice di conteggi},
+  plural={matrici di conteggi},
+  description={Una tabella le cui righe indicizzano le feature (geni o trascritti) e le cui colonne indicizzano le cellule, in cui ogni voce registra quante molecole di quella feature sono state rilevate in quella cellula.}
+}
+
+\newglossaryentry{isoform}{
+  name={isoforma},
+  plural={isoforme},
+  description={Una variante distinta di trascritto maturo prodotta dallo stesso gene tramite splicing alternativo.}
+}
+
+\newglossaryentry{scRnaSeq}{
+  name={sequenziamento dell'RNA a singola cellula (scRNA-seq)},
+  first={Sequenziamento dell'RNA a singola cellula (scRNA-seq)},
+  text={scRNA-seq},
+  description={Sequenziamento dell'RNA eseguito separatamente su migliaia di singole cellule, che rivela l'espressione di ogni cellula.}
+}
+
+\newglossaryentry{bulkRnaSeq}{
+  name={bulk RNA-seq},
+  description={Sequenziamento dell'RNA riunito da molte cellule in una sola volta, che media le differenze tra cellule.}
+}
+
+\newglossaryentry{fullLength}{
+  name={sequenziamento full-length},
+  description={Un approccio di sequenziamento che legge una molecola di RNA da un capo all'altro, anziché solo il frammento più vicino a una delle sue estremità.}
+}
+
+\newglossaryentry{read}{
+  name={read},
+  plural={read},
+  description={Una breve sequenza nucleotidica prodotta dallo strumento di sequenziamento, che costituisce il dato grezzo dell'RNA-seq.}
+}
+
+\newglossaryentry{cellCluster}{
+  name={cluster cellulare},
+  plural={cluster cellulari},
+  description={Un gruppo di cellule con profili di espressione simili, ottenuto raggruppando la matrice di conteggi. La maggior parte delle analisi a singola cellula confronta i cluster cellulari tra loro.}
+}
+
+\newglossaryentry{throughput}{
+  name={throughput},
+  description={Il numero di cellule che un singolo esperimento può processare in una corsa. È in compromesso diretto con la profondità di sequenziamento per cellula, perché uno strumento emette un numero fisso di read che deve essere diviso tra tutte le cellule catturate.}
+}
+
+\newglossaryentry{plateProtocols}{
+  name={metodi su piastra},
+  first={metodi su piastra},
+  description={Un formato di scRNA-seq in cui ogni cellula è isolata nel proprio pozzetto di una piastra multiwell e i suoi trascritti sono catturati da un capo all'altro, così i read coprono l'intera molecola. Il formato preserva le giunzioni di splicing interne e raggiunge una profondità elevata per cellula, al costo di un throughput limitato a centinaia o poche migliaia di cellule.}
+}
+
+\newglossaryentry{dropletProtocols}{
+  name={protocolli a goccia (dati a goccia)},
+  first={protocolli a goccia},
+  text={protocolli a goccia},
+  description={Protocolli a singola cellula ad alto throughput che incapsulano ogni cellula insieme a una bead barcodata in una goccia di picolitri, così che decine di migliaia di cellule siano processate in una sola corsa. Sono il formato di scRNA-seq dominante e la loro chimica di cattura legge solo la coda di ciascun trascritto.}
+}
+
+\newglossaryentry{tagBias}{
+  name={tag bias},
+  first={tag bias},
+  description={Un bias per cui ogni molecola viene letta da una sola delle sue estremità, così la copertura si concentra vicino a quell'estremità mentre l'interno del trascritto non viene mai osservato. Deriva da una chimica di cattura ancorata a una singola estremità, come nei protocolli a goccia con priming sulla coda.}
+}
+
+\newglossaryentry{cellBarcode}{
+  name={cell barcode},
+  plural={cell barcode},
+  description={Una breve etichetta di DNA portata da ogni read di una data cellula, che ne identifica la cellula di origine. Consente di raggruppare i read di una corsa di sequenziamento riunita in profili di espressione per cellula.}
+}
+
+\newglossaryentry{umi}{
+  name={Unique Molecular Identifier (UMI)},
+  first={Unique Molecular Identifier (UMI)},
+  text={UMI},
+  plural={UMI},
+  description={Una breve sequenza casuale legata a ciascuna molecola di RNA catturata prima dell'amplificazione PCR, così che le copie amplificate di una stessa molecola siano riconosciute e contate una sola volta.}
+}
+
+\newglossaryentry{rna}{
+  name={RNA (acido ribonucleico)},
+  first={RNA (acido ribonucleico)},
+  text={RNA},
+  description={L'ampia classe di molecole di acidi nucleici trascritte dal DNA. Comprende l'RNA messaggero (mRNA), che porta le istruzioni per la codifica delle proteine, e gli RNA non codificanti, che svolgono ruoli strutturali o regolatori.}
+}
+
+\newglossaryentry{mrna}{
+  name={RNA messaggero (mRNA)},
+  first={RNA messaggero (mRNA)},
+  text={mRNA},
+  description={Il sottotipo di RNA che codifica proteine e che porta la sequenza di un gene al ribosoma.}
+}
+
+\newglossaryentry{rnaSeq}{
+  name={sequenziamento dell'RNA (RNA-seq)},
+  first={sequenziamento dell'RNA (RNA-seq)},
+  text={RNA-seq},
+  description={Una tecnica che determina la sequenza e l'abbondanza delle molecole di RNA in un campione; è la base dei protocolli a singola cellula discussi in questa tesi.}
+}
+
+\newglossaryentry{splicing}{
+  name={splicing alternativo},
+  first={splicing alternativo},
+  text={splicing alternativo},
+  description={Il processo con cui la lunga copia primaria di RNA di un gene viene accorciata e riorganizzata durante la maturazione. La copia contiene blocchi codificanti (esoni) e blocchi non codificanti (introni); lo splicing rimuove gli introni e unisce gli esoni fiancheggianti nelle giunzioni di splicing risultanti. Quando la selezione degli esoni varia tra i trascritti dello stesso gene, il risultato è più isoforme distinte.}
+}
+
+\newglossaryentry{mutualExclusivity}{
+  name={esclusività reciproca},
+  description={Due feature che compaiono raramente insieme nella stessa cellula (un'associazione negativa), in contrapposizione alla co-espressione.}
+}
+
+\newglossaryentry{gdi}{
+  name={Global Differentiation Index (GDI)},
+  first={Global Differentiation Index (GDI)},
+  text={GDI},
+  description={Una misura di specificità di cluster usata per identificare i geni marcatore e validare la qualità del clustering.}
+}
+
+\newglossaryentry{coexpression}{
+  name={co-espressione},
+  description={La tendenza di due feature (geni o trascritti) a essere rilevate insieme nelle cellule.}
+}
+
+\newglossaryentry{contingencyTable}{
+  name={tabella di contingenza},
+  description={Una tabella $2 \times 2$ che conta, su tutte le cellule, le quattro combinazioni di presenza e assenza di due feature; verifica se esse co-occorrono più o meno di quanto il caso preveda.}
+}
+
+\newglossaryentry{pseudoBulk}{
+  name={aggregazione in pseudo-bulk},
+  description={La pratica di sommare i conteggi di read su gruppi di singole cellule per simulare la profondità del bulk RNA-seq, recuperando potenza statistica a scapito dell'eterogeneità a singola cellula.}
+}
+
+\newglossaryentry{orthogonalValidation}{
+  name={validazione ortogonale},
+  description={Conferma indipendente di un risultato computazionale mediante una diversa tecnica sperimentale.}
+}
+
+\newglossaryentry{transcript}{
+  name={trascritto},
+  plural={trascritti},
+  description={Una molecola di RNA copiata da un gene.}
+}
+
+\newglossaryentry{unsplicedTranscript}{
+  name={trascritti non spliced/spliced},
+  first={trascritto non spliced},
+  text={trascritto non spliced},
+  plural={trascritti non spliced},
+  description={La prima copia di RNA di un gene, che contiene ancora i suoi blocchi non codificanti (introni); è anche detta trascritto primario o pre-mRNA. Il suo corrispettivo è il trascritto spliced, la stessa molecola una volta rimossi quei blocchi, ovvero la forma matura che viene tradotta in proteina.}
+}
+
+\newglossaryentry{spliceJunction}{
+  name={giunzione di splicing},
+  plural={giunzioni di splicing},
+  description={Il confine creato quando due blocchi codificanti (esoni) vengono uniti dopo la rimozione del blocco non codificante interposto (introne). I read che attraversano una giunzione di splicing identificano quali blocchi sono stati uniti insieme.}
+}
+
+\newglossaryentry{gene}{
+  name={gene},
+  plural={geni},
+  description={Un'unità funzionale del genoma che specifica una o più molecole di RNA.}
+}
+
+\newglossaryentry{protein}{
+  name={proteina},
+  plural={proteine},
+  description={Una molecola costruita da una catena di amminoacidi che svolge il lavoro della cellula, tra cui catalizzare reazioni, trasmettere segnali e formare componenti strutturali.}
+}
+
+\newglossaryentry{genome}{
+  name={genoma},
+  description={L'insieme completo del materiale genetico di un organismo, scritto nel DNA e trasmesso di generazione in generazione. È organizzato in geni, le unità funzionali la cui espressione viene misurata.}
+}
+% Sopprime l'intestazione generata dal pacchetto; il capitolo fornisce la propria.
+\renewcommand{\glossarysection}[2][]{}
+% Indicazione di stampa: evidenzia i termini del glossario alla prima occorrenza.
+\renewcommand{\glstextformat}[1]{\textit{#1}}

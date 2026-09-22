@@ -1,0 +1,79 @@
+\documentclass[a4paper, 12pt, twoside,openright]{book}
+\usepackage[english, italian]{babel}
+\selectlanguage{italian}
+\usepackage[osf]{libertinus} %font generale del documento
+\pagestyle{plain} %nessun heading o foot particolare
+% Body size set by \documentclass (12pt); footnotes set to 10pt below = standard convention
+\usepackage[a4paper,top=3cm,bottom=3cm,inner=3cm,outer=3cm]{geometry} %impaginazione e margini documento (symmetric: same margins on every page, no verso/recto shift)
+\usepackage{graphicx, wrapfig} %gestione immagini e grafiche
+\usepackage{array} % modificatori di tipo colonna (>{\raggedright\arraybackslash}p{...}) per le tabelle dell'appendice
+\graphicspath{{images/}}
+\usepackage{amsmath, amsfonts}  % Math and blackboard-bold (\mathbb)
+\usepackage{booktabs}   % Per le linee orizzontali eleganti nelle tabelle (\toprule, \midrule)
+\usepackage{longtable}  % Per le tabelle che si dividono su più pagine
+\usepackage{pdflscape} % Per girare le pagine in orizzontale
+\usepackage{float}           % For figure placement control
+\usepackage[hidelinks,backref=page]{hyperref}  % \url{} plus "Cited on page(s)" back-links in the bibliography
+\usepackage{microtype}  % Better justification and hyphenation, fewer overfull boxes
+\emergencystretch=2em    % Allow extra interword stretch before an overfull line is emitted
+\usepackage{xurl}       % Allows line breaking inside long URLs
+\usepackage{glossaries}  % Hyperlinked glossary entries (\gls{}); page back-links to the text
+\makenoidxglossaries
+\input{chapters/glossary-entries-it}
+\usepackage{enumitem}   % Cleaner list spacing
+\usepackage[nobottomtitles*]{titlesec}   % Heading spacing; keeps section titles off the page foot
+\usepackage[hang,bottom]{footmisc} % Footnotes: hanging indent, no rule line, flush to page bottom
+% Footnote styling: no rule line, smaller text, inset from main-text margin, hanging indentation
+\renewcommand{\footnoterule}{}                        % no separator line between text and footnote
+\renewcommand{\footnotesize}{\fontsize{10}{12}\selectfont}  % standard footnote size: 10pt for a ~12-13pt body
+\begingroup\footnotesize\setlength{\footnotemargin}{2em}\endgroup  % footnotes inset from text margin (measured at footnote size)
+\setlength{\footnotesep}{8.4pt}  % standard inter-footnote gap (bk12 default)
+\setlist{topsep=0.6em, partopsep=0pt, itemsep=0.15em, parsep=0pt}  % Lists match paragraph rhythm
+\titleformat{\section}{\Large\bfseries}{}{0pt}{}
+\titlespacing*{\section}{0pt}{1.4em plus 1pt minus 1pt}{0.6em}
+\titleformat{\subsection}{\large\bfseries}{}{0pt}{}
+\titlespacing*{\subsection}{0pt}{1.1em plus 1pt minus 1pt}{0.4em}
+\titleformat{\subsubsection}{\normalsize\bfseries}{}{0pt}{}
+\titlespacing*{\subsubsection}{0pt}{0.9em plus 1pt minus 1pt}{0.3em}
+% Avoid single orphan/widow lines at page boundaries; keep vertical flow unstretched
+\widowpenalty=10000
+\clubpenalty=10000
+\displaywidowpenalty=10000
+\raggedbottom
+% Definition note placed at the bottom of the page where the concept first appears
+\newcommand{\defn}[2]{\footnote{\textbf{#1:}~#2}}
+\setlength{\parindent}{0pt}     % No paragraph indentation
+\setlength{\parskip}{1em}       % Space between paragraphs
+\setcounter{tocdepth}{1}        % Table of contents: chapters and sections only
+
+\begin{document}
+% Seed the core COTAN reference so it is numbered [1] under citation-order style
+\nocite{galfre2021cotan}
+% Front matter (roman page numbers)
+\frontmatter
+% Title page
+\input{chapters/frontespizio}
+\input{chapters/00-abstract-it}
+% Table of contents (front matter, after the abstract)
+\tableofcontents
+% Glossary (front matter, after the abstract and before the main content)
+\input{chapters/glossary-it}
+
+% Main content (numbered chapters, arabic page numbers)
+\mainmatter
+\input{chapters/01-introduction-it}
+\input{chapters/02-background-it}
+\input{chapters/03-methods-it}
+\input{chapters/04-results-discussion-it}
+\input{chapters/05-conclusion-it}
+
+% Bibliography (global, after all chapters)
+\cleardoublepage
+\addcontentsline{toc}{chapter}{Bibliografia}
+\bibliographystyle{unsrt}
+\bibliography{bib/riferimenti}
+
+% Appendix (optional)
+\appendix
+\input{chapters/appendix-it}
+\end{document}

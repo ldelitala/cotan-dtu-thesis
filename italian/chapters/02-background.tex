@@ -1,0 +1,79 @@
+\chapter{Background and Fundamentals}
+
+This chapter reviews the theoretical and statistical principles foundational to this thesis.
+
+\section{Single-Cell RNA Sequencing (scRNA-seq)}
+
+\subsection{Overview}
+Bulk RNA-seq averages gene expression across thousands of cells. Single-cell RNA sequencing (scRNA-seq) profiles each cell individually[cite: 1]. This reveals cellular heterogeneity hidden in bulk measurements. The output of an scRNA-seq workflow is an expression count matrix $X \in \mathbb{N}^{G \times C}$, where rows index genomic features (genes or transcripts), columns represent distinct single cells, and entry $x_{ij}$ records the observed read count for feature $i$ in cell $j$.
+
+\subsection{Pseudo-Alignment}
+Quantifying transcript expression requires mapping short sequencing reads to a reference transcriptome. Traditional alignment algorithms map reads base-by-base against a reference genome, a process that is computationally intensive[cite: 1]. Modern transcriptomics relies on \textbf{pseudo-alignment}: rather than finding exact base-level coordinates, pseudo-alignment algorithms (such as Salmon or alevin-fry) use index structures of length-$k$ substrings ($k$-mers) to identify the equivalence class of transcripts compatible with a given read[cite: 1]. By bypassing explicit coordinate mapping, pseudo-aligners achieve orders-of-magnitude speedups while maintaining high quantification accuracy.
+
+\subsection{The Expectation-Maximization (EM) Algorithm}
+A major challenge in pseudo-alignment is \textbf{multi-mapping reads}---reads that match multiple distinct transcript isoforms due to sequence similarity[cite: 1]. This problem is particularly acute for $3'$-biased or $5'$-biased protocols. When a read captures only the terminal region of a transcript, it may map equally well to all isoforms sharing that exon [cite: 1]. Full-length sequencing (e.g., SMART-seq2) often produces reads spanning unique internal exons that unambiguously identify the source transcript[cite: 1].
+
+Pseudo-alignment algorithms like Salmon and alevin-fry resolve this ambiguity using the Expectation-Maximization (EM) algorithm. Rather than discarding multi-mapping reads, EM probabilistically assigns them to transcripts without losing information.
+
+The EM algorithm is an iterative optimization technique used to find maximum likelihood estimates in statistical models with latent variables:
+\begin{itemize}
+    \item \textbf{Expectation (E-step):} For each multi-mapping read, calculate the probability it belongs to every candidate transcript.
+    \item \textbf{Maximization (M-step):} Update global transcript abundances using these probabilities.
+\end{itemize}
+
+Each iteration refines abundance estimates. This assigns fractional read counts across isoforms while preserving relative signals[cite: 1]. For DTU detection, this matters—discarding ambiguous reads would lose the signal needed to distinguish similar isoforms.
+
+\section{The Matrix Sparsity Problem}
+Single-cell count matrices are characterized by extreme sparsity, with zero values typically accounting for 70--90\% of the matrix entries[cite: 1]. In count matrices, these zeros represent a mixture of two distinct phenomena:
+\begin{itemize}
+    \item \textbf{Biological Zeros:} True absences where a gene or transcript is not transcribed in a specific cell state.
+    \item \textbf{Technical Zeros (Dropouts):} False absences where an mRNA molecule was present in the cell but failed to be captured, reverse-transcribed, or sequenced due to low chemical capture efficiency (typically 10--20\%).
+\end{itemize}
+
+Because biological and technical zeros are numerically indistinguishable in raw count matrices, sparsity introduces severe statistical hurdles.
+
+\section{Limitations of Traditional Analytical Approaches}
+Statistical methods designed for bulk RNA-seq (where each sample represents thousands of cells) assume relatively high read depth and low sparsity. When directly applied to zero-inflated single-cell count matrices, their mathematical assumptions are violated[cite: 1]:
+
+\begin{enumerate}
+    \item \textbf{Variance-Stabilizing Transformations:} Bulk analysis commonly uses $\log(x+c)$ (where $c$ is a pseudo-count) to normalize skewed count distributions. On zero-inflated matrices, adding an arbitrary pseudo-count and logging non-linearly distorts low-abundance measurements, compressing zeros into artificial scaling artifacts[cite: 1].
+    
+    \item \textbf{Linear Correlation Metrics:} Pearson and Spearman correlations assume smooth, continuous distributions. In sparse matrices, these metrics are distorted by the joint occurrence of technical zeros, measuring dropout coincidence rather than true regulatory co-expression[cite: 1].
+    
+    \item \textbf{Imputation Methods:} Heuristic smoothing replaces zeros with estimated values based on neighboring cells, frequently introducing artificial correlations and spurious downstream signals[cite: 1].
+\end{enumerate}
+
+Consequently, analyzing sparse single-cell data requires statistical models that treat zero observations explicitly rather than applying transformations designed for dense bulk data.
+
+\section{Prior Work on Differential Transcript Usage (DTU)}
+Differential Transcript Usage (DTU) analysis detects changes in the relative proportions of transcript isoforms between conditions or cell types, independent of overall gene expression[cite: 1]. Established bulk RNA-seq methods (such as rMATS, SUPPA2, or DRIMSeq) rely on continuous proportion modeling, junction-spanning read depths, or Dirichlet-multinomial distributions.
+
+When applied to single-cell data, these methods largely fail because low per-cell sequencing depth results in degenerate proportion estimates, while terminal positional biases render internal splicing events invisible[cite: 1]. Furthermore, aggregating cells into pseudo-bulk profiles to recover read depth obscures the cell-to-cell heterogeneity that drives DTU.
+
+\section{Statistical Foundations: Contingency Tables}
+To handle extreme sparsity without imputation or transformation, the COTAN framework bypasses continuous count amplitudes and instead evaluates pairwise dependencies using asymptotic independence testing on binary presence/absence states[cite: 1].
+
+For any two features A and B, their co-occurrence across $N$ cells is discretized into a $2\times2$ contingency table. Under the null hypothesis ($H_0$) of statistical independence, the expected joint frequency $E_{ij}$ is defined as:
+$$E_{ij} = \frac{R_i \cdot C_j}{N}$$
+where $R_i$ is the row marginal total, $C_j$ is the column marginal total, and $N$ is the total number of cells[cite: 1].
+
+The deviation between observed counts $O_{ij}$ and expected counts $E_{ij}$ is evaluated via Pearson's chi-squared test statistic[cite: 1]:
+$$\chi^2 = \sum_{i\in\{0,1\}} \sum_{j\in\{0,1\}} \frac{(O_{ij} - E_{ij})^2}{E_{ij}}$$
+
+Because droplet scRNA-seq datasets typically contain thousands of cells ($N \gg 30$), the asymptotic chi-squared approximation remains robust[cite: 1]. This enables computationally efficient, large-scale hypothesis testing across millions of feature pairs without the bottleneck of exact inference methods.
+
+\section{The COTAN Analytical Framework}
+The COTAN (Co-expression Tables Analysis) framework is designed to model zero-inflated distributions directly without relying on data imputation or variance-stabilizing transformations[cite: 1].
+
+The core premise of COTAN is that the binary occurrence pattern of features across thousands of cells carries structural regulatory signals. By discretizing expression into binary presence/absence states and evaluating pairwise associations using contingency-table statistics, COTAN is robust to sequencing depth variations and library size imbalances[cite: 1]. Within this framework, negative statistical associations (mutual exclusivity) between isoforms of the same gene serve as a primary indicator of alternative transcript usage.
+
+COTAN generates three primary metrics[cite: 1]:
+\begin{enumerate}
+    \item \textbf{Co-expression Matrix (coex):} Measures normalized pairwise associations derived from contingency table statistics.
+    
+    \item \textbf{Differential Expression Analysis (DEA):} Quantifies feature detection probabilities across cellular subpopulations, enabling identification of cluster-specific markers.
+    
+    \item \textbf{Global Differentiation Index (GDI):} Identifies condition-specific markers by measuring how specifically a feature is expressed relative to the rest of the dataset; also serves as a homogeneity check for clustering quality.
+\end{enumerate}
+
+In summary, because current DTU algorithms fail on droplet scRNA-seq data due to matrix sparsity and positional bias, this thesis adapts the COTAN framework to transcript-level matrices to identify mutually exclusive isoform pairs without requiring artificial imputation or gene-level aggregation[cite: 1]. The combination of pseudo-alignment for transcript quantification, contingency-table statistics for sparse data modeling, and mutual exclusivity as a DTU indicator provides a theoretically grounded approach to recovering isoform switches from challenging single-cell datasets.

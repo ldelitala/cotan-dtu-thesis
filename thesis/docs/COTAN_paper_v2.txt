@@ -1,0 +1,1291 @@
+NAR Genomics and Bioinformatics, 2026, 8, lqag048
+https://doi.org/10.1093/nargab/lqag048
+Computational Methods for Transcriptome Analysis
+
+From gene correlations to cell clusters: COTAN improved
+scRNA-seq analysis
+1
+
+, Matteo Tolloso
+
+1
+
+,
+
+1
+
+Department of Computer Science, University of Pisa, Largo B. Pontecorvo, 3, 56127, Pisa, Italy
+Department of Mathematical, Physical and Computer Sciences, University of Parma, Parco Area delle Scienze, 53/A, Parma 43124, Italy
+3
+Department of Computer Science and Engineering, Alma Mater Studiorum University of Bologna, Via Mura Anteo Zamboni, 7, Bologna
+40126, Italy
+4
+Department of Mathematics, University of Pisa, Largo B. Pontecorvo, 5, 56127, Pisa, Italy
+2
+
+∗
+†
+
+To whom correspondence should be addressed. Email: silvia.galfre@unipi.it
+The last two authors should be regarded as joint last authors.
+
+Abstract
+Single-cell RNA-sequencing (scRNA-seq) now routinely profiles thousands of individual transcriptomes, yet no consensus pipeline exists for
+either laboratory protocol or downstream analysis. Droplet-based datasets are especially challenging: their count matrices are extremely sparse
+and many biologically important genes are expressed at very low levels. Standard workflows, borrowed from bulk RNA-seq, apply normalization,
+log-transformation, and feature filtering, steps that can distort true-zero counts and systematically discard low-expression regulators. A method
+that natively handles sparsity, avoids imputation, and retains informative low-abundance genes is therefore desirable. We present an extended
+version of the COTAN workflow, a framework based on gene correlations that models zero counts directly, requires no log-normalization or scaling,
+and is tailored to UMI droplet data. COTAN’s key features are (i) robust gene–gene correlation matrices, validated on diverse public datasets, (ii)
+a superior detection of differentially expressed genes, including those with very low expression, consistently outperforming leading tools, (iii) a
+highly sensitive statistical scoring, able to detect heterogeneous cell groups and to confirm whether a cluster is truly transcriptomically uniform.
+Together, these advances provide a biologically grounded, end-to-end solution for scRNA-seq analysis. COTAN is available in Bioconductor and
+on GitHub. Supplementary information is available at this site.
+
+Introduction
+Single-cell RNA-seq (scRNA-seq) enables the simultaneous
+profiling of the transcriptomes of thousands of individual cells
+and has rapidly become a routine tool in molecular biology.
+Although the technique was first described in 2009, there is
+still no universally accepted gold-standard pipeline, either for
+the wet-lab protocol or for downstream data analysis. The optimal analytical strategy often depends on the biological question being addressed. At present, many widely used platforms
+are droplet-based [1–3], incorporate Unique Molecular Identifiers (UMI) [1–4] and pose substantial computational challenges [5–8], chiefly because of the extreme sparsity of the
+count matrix [9, 10] and the frequent presence of key genes
+expressed at very low levels [11, 12].
+Most analytical pipelines [13–17], inspired by the bulk
+RNA-seq approach, apply normalization, scaling, and logtransformation to render cell-to-cell expression comparable, often followed by feature selection that excludes lowly
+expressed genes. While these steps can be useful, they
+may also introduce biases such as artificial drop-outs [18]
+and make it virtually impossible to study genes expressed
+at low levels [11]. Unfortunately, many biologically crucial genes, including key regulators, fall into this category
+[12].
+
+To overcome these limitations, COTAN does not rely on
+log-transform, normalization, or scaling steps. Our model
+treats the observed counts as Poisson samples from an underlying parametric gene-expression distribution, in line with
+similar models used in [18, 19–21] and corresponding to the
+large number approximation of multinomial models like [22].
+We fit one “library size” parameter per cell and two parameters per gene, with the critical choice of modeling the probability of zero counts of each gene, besides the average. So,
+we do not assume an extra zero-inflation mixture component
+beyond an overdispersed count model; instead, we calibrate
+parameters using the observed zero frequency. COTAN does
+not need imputation and is able to bypass the sparsity problem [10].
+The new COTAN release preserves the original mathematical core [23] while providing a more rigorous evaluation
+of gene–gene correlations and extending co-expression analysis [24–26] into an end-to-end scRNA-seq workflow. We
+updated the pipeline by improving and extending the cleaning and plotting functions, adding a new gene-enrichment
+function that is competitive with state-of-the-art tools (especially for lowly expressed genes), and implementing two clustering strategies. COTAN is now easier to run and, on average, around seven times faster on typical datasets than the
+
+Received: August 12, 2025. Revised: April 15, 2026. Accepted: April 20, 2026
+© The Author(s) 2026. Published by Oxford University Press.
+This is an Open Access article distributed under the terms of the Creative Commons Attribution-NonCommercial License
+(https://creativecommons.org/licenses/by-nc/4.0/), which permits non-commercial re-use, distribution, and reproduction in any medium, provided the
+original work is properly cited. For commercial re-use, please contact reprints@oup.com for reprints and translation rights for reprints. All other
+permissions can be obtained through our RightsLink service via the Permissions link on the article page on our site—for further information please contact
+journals.permissions@oup.com.
+
+Downloaded from https://academic.oup.com/nargab/article/8/2/lqag048/8688779 by Dipartimento Di Scienze Della Terra user on 10 July 2026
+
+Silvia Giulia Galfrè 1 ,* , Marco Fantozzi 2 , Alina Sîrbu 3 , Irene Testa
+Andrea Alberti1 , Corrado Priami 1 ,† , Francesco Morandin 4 ,†
+
+2
+
+Galfrè et al.
+
+Materials and methods
+Theoretical model
+COTAN is based on the computation of a gene co-expression
+matrix (coex) C between genes. Each matrix element Ci, j represents the co-expression coefficient between the two genes i
+and j, a number typically in the range (−1, 1), similar to a correlation coefficient between the expression levels of the two
+genes across cells. The coefficient Ci, j measures the deviation
+between the 2 × 2 contingency table of the joint occurrence
+of genes i and j in the cells, and the expected co-expression
+assuming independence between i and j (see “Correlation matrix” in Supporting materials).
+The formula for Ci, j is a modified version of the Phi coefficient of the contingency table, which also corresponds to
+the Pearson correlation of the binarized counts (see “Phi coefficient” in Supporting materials). The main difference is the
+method used to estimate the expected number of cells expressing both genes. In a standard contingency table this quantity
+would be estimated proportionally to the marginals, but for
+single-cell datasets this yields spurious correlations due to the
+variable library size of cells. In fact, cells with lower detection
+efficiency will generally have more zeros across genes, creating artificial co-dropouts and resulting in an overestimation
+of the gene correlations. coex instead estimates the expected
+number of cells expressing both genes using a robust probabilistic model with two parameters for each gene and one for
+each cell. This model is described in detail in [23]. In brief,
+for each gene g in each cell c, it estimates the probability of a
+zero count using a negative binomial distribution with mean
+λgνc and shape parameter αg. Here, λg represents the average
+expression of gene g, νc is proportional to the library size of
+cell c, and αg is calibrated from the observed number of zeros for gene g. A key feature of the model is that it is focused
+on the zero occurrences, rather than to the entire read-count
+distribution.
+
+Datasets
+To evaluate our tool’s performance, we selected a diverse collection of datasets (21 in total, coming from 13 different experiments, listed in Supplementary Table S1), spanning both
+early and recent studies and covering a range of sequencing efficiencies and protocols, in some cases providing cellclustering information [1, 28–34].
+Some datasets were formed by different batches, runs or
+developmental time points. In these cases, the main dataset
+
+was divided in more subsets. Most datasets have UMI but we
+also tested three different datasets without them.
+For the La Manno dataset [35], we selected the time points
+E13.5, E15.0, and E17.5 and restricted further to neuronal
+cells (classified as “neuron” by the top clustering level included
+in the original study). For the Brown PBMC dataset [36] we
+selected three runs with an intermediate cell number.
+We also defined refined versions of the La Manno and
+Brown datasets, both consisting of 15 clusters from the original analysis that were chosen for their large size and internal
+homogeneity (see Supplementary Table S3 and the “Use of
+datasets” section in Supporting materials, for details).
+
+COEX matrix
+Tools such as Seurat [15], Scanpy [17], and Monocle [14]
+compute the normalized expressions of genes, from which one
+can also obtain a gene correlation matrix. Other frameworks
+like CS-CORE [37] and Scenic [38], are specifically intended
+to study gene co-expression, without log-transformation or
+scaling and without filtering lowly expressed genes. COTAN
+falls in the same group, and the coex should be interpreted
+as an alternative co-expression or correlation matrix between
+genes.
+We compared coex with the gene correlations from the
+other tools, by assessing the distribution of the associated pvalues for pairs of genes that should and should not be independent. In fact, correlation coefficients Ci, j over m cells can
+be converted to p-values pi, j for the null hypothesis of gene
+independence, with pi, j = P(χ 2 (1) > m Ci,2 j ) (where χ 2 (1) is
+a chi-squared random variable with one degree of freedom).
+The analysis was performed separately on the 12 mouse brain
+and 7 human PBMC datasets of Supplementary Table S1.
+For the mouse brain datasets we selected 16 constitutive
+and 45 neural marker genes (in particular, we selected some
+neural progenitor genes, some pan neuronal genes, and some
+cortex layer marker genes). Similarly, for human blood we
+selected 20 constitutive transcription factors [39] and 38
+PBMC cell markers (some CD4 T cell markers, B cell and
+other markers specific for other PBMC subpopulations, see
+Supplementary Table S2 for the complete list). Marker genes
+should typically show significant correlation (either positive
+or negative) with each other, since they are specific only to
+some sub-populations (no independence, alternative hypothesis). On the other hand, when one or both genes are constitutive, since their expression is roughly uniform, the correlation
+should be typically low (independence, null hypothesis).
+
+= 1830 gene
+For the brain datasets we formed all the 61
+2
+pairs and divided them into 840 pairs where at least one of
+the genes is constitutive (hk, null hypothesis) and 990 pairs
+where both genes are markers (mg, alternative hypothesis).
+For the PBMC datasets, with the same approach, we obtained
+950 hk gene pairs and 703 mg gene pairs. For each method,
+dataset and hypothesis, we computed the p-values for all possible pairs of genes, and compared their distribution.
+
+Differential expression analysis
+The theoretical model of coex can also be used to assess the
+differential expression of genes when partitioning cells into
+two subsets. Let A be a subset of cells and i a gene. COTAN’s
+differential expression analysis (dea) computes the 2 × 2 contingency table that counts cells inside or outside A, for which
+gene i occurs or not. A correlation coefficient Di,A is then
+
+Downloaded from https://academic.oup.com/nargab/article/8/2/lqag048/8688779 by Dipartimento Di Scienze Della Terra user on 10 July 2026
+
+previous version. For a more comprehensive list of changes,
+see the COTAN changes in version 2.
+We validate COTAN across a wide range of datasets, showing that its gene correlation matrix is both robust and highly
+reliable on scRNA-seq protocols with UMI. We also demonstrate that the model consistently detects differentially expressed genes, even in difficult datasets and for very lowexpression genes, outperforming every other tool we tested.
+We examine the Global Differentiation Index (gdi), an exceptionally sensitive metric for uncovering distinct cell populations. The gdi offers an objective way to decide whether a
+cluster is genuinely transcriptomically uniform, thus supporting a biologically grounded definition of cell types.
+All data and results are available at the COTAN analysis
+website [27].
+
+COTAN for scRNA-seq analysis
+
+GDI and UT clusters
+Starting from the coex matrix, COTAN computes a gdi for
+each gene. For gene i, the gdi is based on the lower tail of
+the pairwise association p-values obtained by testing gene i
+against all other genes j: we first compute p̄i , the mean of
+the smallest 5% of these p-values, and then apply the transformation gdii = ln(− ln( p̄i )) which yields a more compact
+and readily interpretable distribution of index values (see
+also [23]).
+This construction is motivated by the expectation that constitutively expressed genes exhibit uniformly weak associations with other genes, producing a lower-tail p-value distribution that is approximately uniform on [0,0.05]. By contrast,
+genes whose expression varies across cell sub-populations
+tend to show both positive and negative associations with sets
+of cell-type enriched genes, leading to an excess of very small
+p-values in the lower tail. Under the null hypothesis of expression independence from cell sub-population, the median gdi
+is therefore expected to be ln(− ln(0.025)) ≈ 1.305.
+The 5% cutoff was selected because, in typical datasets, it
+yields on the order of 500–1000 genes, consistent with the
+magnitude of cell-type “elevated” gene sets reported in atlas
+
+studies [42]. Higher gdi values indicate genes that show significant association with many others and thus provide an empirical measure of within dataset differentiation. Notice that
+the gdi values depend on the specificity of the dataset taken
+into account. Generally, via empirical testing, gdii > 1.5 suggests that gene i may be differentially expressed and supports
+follow-up with dea. On the other side, values < 1.4 can be
+associated with relatively uniform expression.
+This observation suggests that, if COTAN is applied to a
+subset of cells, rather than to the entire dataset, it is possible to examine the upper tail of the genes’ gdi values to decide
+whether that subset is homogeneous or contains multiple subpopulations. In practice, one might, for instance, see whether
+the highest percentile of gdis exceeds a suitable threshold chosen accordingly to the above levels, and conclude whether the
+subset contains multiple sub-populations. The specific value
+of the threshold, however, should be adjusted to suit the specific dataset and the level of sensitivity needed.
+To assess the sensitivity of this approach to small deviations from homogeneity, we performed a large number of experiments on samples with two types of cells, varying both
+their proportion and the degree of difference between their
+types (see Supplementary Fig. S1). We considered pairs of clusters from the refined La Manno dataset (see Supplementary
+Table S3). Each possible pair of clusters was combined at several mixing ratios, and for every synthetic sample we recorded
+the top 1% of the gene-wise gdi distribution. Finally, we analyzed the dependence of this quantity on the two covariates.
+Whatever the exact criterion on the tail of gdi distribution
+one chooses, if a subset of cells passes the homogeneity test,
+we call it a Uniform Transcript (ut) cluster.
+To evaluate whether the ut label reflects a biologically relevant property, we examined its association with our ability to
+distinguish two cell types within a cluster. We created mixtures
+by pairing clusters from the refined La Manno dataset, selecting some that were still classified as ut and others that were
+not. For each mixture we trained a logistic-regression model to
+predict the two underlying classes and recorded its accuracy.
+To ensure that the trained models were biologically meaningful and not statistical artifacts, the input variables were the
+normalized expression levels of just the top 100 highly variable genes.
+
+Applications
+Clustering with the COEX
+The coex matrix also allows for the recovery of useful information for clustering cells.
+In conventional scRNA-seq workflows, the gene-expression
+matrix is first reduced with Principal Component Analysis
+(PCA), and the resulting low-dimensional representation is
+then clustered with a shared-nearest-neighbor modularityoptimization algorithm. Instead, we compute the eigenvalues
+and eigenvectors of the coex matrix and project the data onto
+the eigenvectors associated with the largest eigenvalues, using this projection as the dimensionality-reduced input for
+clustering.
+To make this strategy effective, we replace raw normalized
+expression values with a statistic that couples the observed
+pattern of zero counts with their modeled probabilities (see
+the “Mathematical framework” section in [23]). Specifically,
+we use the p-derivative of the log-likelihood for each binaz
+1−z
+rized observation, pg,c
+− 1−pg,c
+, where zg,c = 1 if gene g has
+g,c
+g,c
+
+Downloaded from https://academic.oup.com/nargab/article/8/2/lqag048/8688779 by Dipartimento Di Scienze Della Terra user on 10 July 2026
+
+computed from the table, similarly to Ci, j . This number is a
+measure of the enrichment or depletion of gene i inside A, in
+the range (−1, 1), and again it can be converted to a p-value
+pi,A for the null hypothesis that the gene is equally expressed
+inside and outside A, with pi,A = P(χ 2 (1) > m D2i,A ).
+dea can be used on a partition A1 , A2 , . . . , An of more than
+two subsets: for each subset A j the differential expression is
+computed versus the complementary set ACj (one-vs-rest comparisons). The resulting enrichment matrix D has a row for
+every gene i and a column for every set A j .
+We compared COTAN’s dea with analogous markerdetecting functions available in Seurat, Scanpy, Monocle and Memento [40] both for false-positive rate and for
+statistical power. As homogeneous starting points, we selected the 15 clusters of the refined La Manno dataset (see
+Supplementary Table S3).
+To evaluate the false-positive rate, cells from a single cluster
+were randomly divided into two subsets, and genes identified
+as enriched in either subset were considered false positives.
+However, a completely random split would yield very few false
+positives. To work in more challenging conditions, we instead
+partitioned the cells based on library size. For each cluster, we
+generated “high-” and “low-” library-size subsets across five
+different proportion splits, and counted the number of genes
+each method identified as significantly enriched (adjusted pvalue < .05).
+To assess statistical power, we constructed 27 heterogeneous datasets by combining cells from 2, 3, or 5 distinct clusters (see Supplementary Table S5). In this context, a ground
+truth can be established, identifying genes that are enriched
+in some but not all clusters as true positives, and others
+as true negatives. The ability to detect these genes as enriched/depleted in some cluster was then evaluated by computing the Receiver Operating Characteristic (ROC) curve,
+which is derived from the collection of p-values across all
+gene-cluster pairs. For this comparison we could also include
+the differential expression tool of scVI [20, 41], which ranks
+genes by probability of being differentially expressed, even if
+it does not return regular p-values.
+
+3
+
+4
+
+Galfrè et al.
+
+zero counts in cell c and pg,c is the modeled probability of
+that event. Clustering is then obtained using Seurat’s FindNeighbors and RunModularityClustering functions.
+To evaluate our clustering algorithm, we applied it to a wellcharacterized scRNA-seq dataset of seven human lung-cancer
+cell lines (see Supplementary Table S1, CL Arigoni), whose
+true identities are known independently of any clustering procedure. We benchmarked our method against two Seurat
+workflows: standard and SCTransform [15, 16, 43]. For all
+of them, we varied the resolution parameter from 0.16 to 0.50
+in steps of 0.02. This range yields 10–15 clusters, allowing all
+methods to be compared with the same number of clusters
+when calculating performance metrics. In fact, although there
+are seven original cell lines, the UMAP embedding (as shown
+in Supplementary Fig. S3) suggests at least 10 distinct transcriptional states, including three small “outlier” clusters.
+The metrics we chose evaluate clustering quality from two
+complementary sides: entropy-based homogeneity (EH) measures within-cluster purity, whereas entropy-based completeness (EC) measures how fully members of the same true class
+are grouped together. Their chance-corrected versions, adjusted mutual information (AMI) and adjusted Rand index
+(ARI), combine homogeneity and completeness into single,
+overall agreement scores.
+The CD14 dataset
+To assess the ut clustering approach from a biological perspective, we clustered a nearly uniform dataset: the FACSsorted CD14+ (see Supplementary Table S1, CD14). Such a
+dataset is useful because it can test a tool’s ability to detect
+
+and identify even subtle differences among closely related cell
+types. We compared COTAN with two automatic clustering
+and labeling methods: CellTypist [44] and Azimuth [43].
+For each COTAN cluster, significantly enriched genes were then
+identified with the dea function (adjusted p-value < .05), used
+to label the clusters, and submitted to gene-enrichment analysis using STRING [45, 46] to identify the cluster nature and
+characteristics.
+
+Results
+Gene correlations
+We compared coex with Pearson correlation computed on
+normalized gene expression levels obtained by Seurat,
+Scanpy and Monocle. We also included CS-CORE, the
+Spearman correlation of the raw UMI counts (which Scenic
+uses internally), and the Pearson correlation of the binarized
+counts (binary).
+Fig. 1 shows the empirical distribution functions (eCDF)
+for the gene correlation p-values obtained by COTAN and
+other tools for 7 representative datasets, all with UMI (see
+Supplementary Fig. S2 for the complete results). In the case of
+the alternative hypothesis (dashed lines), p-values should be
+small (with high eCDF), and COTAN closely mirrors the behavior of the best other tools.
+In the case of the null hypothesis (solid lines), in contrast,
+p-values should be high (with low eCDF), and in particular
+gene pairs with p-value below .05 can be considered false positives. All methods result in high fractions of false positives,
+but COTAN is consistently the best on the datasets with UMI
+
+Downloaded from https://academic.oup.com/nargab/article/8/2/lqag048/8688779 by Dipartimento Di Scienze Della Terra user on 10 July 2026
+
+Figure 1. Distribution (eCDF) of p-values derived from correlation coefficients, for the null hypothesis of independent expression, for gene pairs with
+both marker genes (mg) and with at least one constitutive gene (hk), restricted to the interval [0, 0.05]. The p-values should be large for hk pairs (solid
+lines, null hypothesis, lower eCDFs are better) and small for mg pairs (dashed lines, alternative hypothesis, higher eCDFs are better). The seven panels
+correspond to a representative selection of datasets. For COTAN we used the COEX as sample correlation matrix; for Monocle, Scanpy, and Seurat
+(with or without SCTransform), we used the Pearson correlation between normalized expression levels; for CS-CORE, we used its own p-values;
+Scenic internally applies the Spearman correlation between the raw counts, also used here; in binary we used the Pearson correlation between the
+binarized counts, equivalent to the Phi coefficient of the contingency table also employed for the COEX. Since Scanpy performs the same normalization
+as Seurat, they give the same results.
+
+COTAN for scRNA-seq analysis
+
+0.25
+
+0.33
+
+0.5
+
+0.67
+
+5
+
+0.75
+
+100
+
+30
+
+10
+
+Method
+
+COTAN
+
+Memento
+
+Monocle
+
+Scanpy
+
+Seurat
+
+Figure 2. Box-plots of the number of genes erroneously detected as significantly enriched, for five arbitrary subdivisions of several homogeneous
+datasets (false positives, lower is better). Each dataset is one cluster from the refined La Manno dataset, split into high and low library size cells. The
+five panels refer to different proportions, with the fraction of high library size cells reported on top. Each panel and method includes 15 data points, one
+per dataset. The y-axis is the number of false-positive genes (log scale with an added pseudo-count of 10).
+
+(see also Supplementary Fig. S2 and Supplementary Table S4),
+proving that coex is a better correlation matrix for gene expression, with fewer spurious correlations and a more reliable
+signal. The poor performance of the standard Phi coefficient,
+on the other hand, shows the importance of COTAN’s probabilistic model for the expected number of zeros.
+
+Gene enrichment
+We compared dea with analogous functions in Seurat,
+Scanpy, Monocle, Memento, and scVI.
+To evaluate false positives, we arbitrarily split each uniform
+cluster by library size into two subsets, and applied the differential expression tools (see Fig. 2). While all methods identified numerous genes as significantly enriched, COTAN consistently exhibited the lowest false-positive rate, owing to its
+robust probabilistic model that effectively accounts for library
+size.
+To evaluate sensitivity and specificity for identifying enriched or depleted genes, we applied each method to heterogeneous cell mixtures constructed from pure clusters and quantified performance using ROC curves (Fig. 3 and Supplementary
+Figs S8 and S9). COTAN achieved the best overall performance,
+sometimes on par with scVI, whereas the remaining methods showed consistently lower accuracy. Notably, scVI reports posterior probabilities rather than frequentist p-values,
+which complicates calibration to a fixed significance threshold. COTAN was particularly sensitive for lowly expressed
+genes (Fig. 3D), an important property given that many regulatory factors are expressed at low levels.
+
+GDI sensitivity
+We generated 1050 synthetic mixtures by blending two cell
+types at different mixing ratios and, for each mixture, computed the 99th percentile of the gene-wise gdi distribution.
+The resulting box plots (Fig. 4 and Supplementary Fig. S5)
+show a clear, monotonic rise in this top gdi percentile as the
+
+fraction of the second cell type increases. The steepness of
+the rise is governed by the transcriptomic distance between
+the two parent clusters (such distance is defined in “Use of
+datasets” in Supporting materials). For very similar cluster
+pairs (panel 1) the growth is slow, confirming that gdi is resilient to minor perturbations. By contrast, introducing even
+5% of cells from a distant cluster (panel 6) markedly elevates the top gdi percentile. All cells in this experiment came
+from the same dataset and were annotated as neurons, so even
+the “distant” pairs represent comparatively subtle biological
+differences. We also tested the same procedure on a setting
+where cell transcriptomes are even more similar, restricting
+the analysis to CD4 and CD8 T cells from Brown PBMC
+Run 40. The results were comparable, but with lower values
+(Supplementary Fig. S7).
+We also repeated the experiment using outsider cells randomly drawn from two distinct clusters, to ensure the observed sensitivity was not an artifact of introducing cells from
+a single external cluster (see Supplementary Fig. S6).
+Overall, the results show that introducing even a small fraction of transcriptionally distinct cells leads to a pronounced
+increase in the top gdi percentile.
+We investigated whether a mixture’s ut label can predict
+how accurately its constituent cell types can later be separated.
+As illustrated in Fig. 5, which shows logistic regression accuracy versus ut status, mixtures classified as ut (or borderline
+ut) consistently yield lower classification accuracy (datasets
+on the left) than mixtures flagged as non-ut (datasets on the
+right). In other words, when COTAN detects heterogeneity (the
+ut criterion fails), the underlying cell types can be reliably distinguished, often using the expression of only a handful of
+genes.
+
+COEX-based clusters
+To evaluate our new coex-based clustering algorithm, we
+benchmarked COTAN against two Seurat workflows: standard and SCTransform. The algorithms were applied to a
+
+Downloaded from https://academic.oup.com/nargab/article/8/2/lqag048/8688779 by Dipartimento Di Scienze Della Terra user on 10 July 2026
+
+(N.Genes + 10)
+
+300
+
+6
+
+Galfrè et al.
+
+A
+
+B
+
+1.00
+
+TPR
+
+0.75
+
+0.50
+
+0.50
+
+0.25
+
+0.25
+
+0.00
+
+0.00
+0.00
+
+0.25
+
+0.50
+
+0.75
+
+1.00
+
+0.00
+
+0.25
+
+0.50
+
+FPR
+
+C
+
+1.00
+
+D
+1.00
+
+197
+1256
+
+Number of genes (scaled)
+
+COTAN
+Seurat
+
+0.50
+
+Seurat_scTr
+Seurat_Bimod
+Monocle
+Scanpy
+
+40
+
+69
+
+34
+
+139
+669
+
+413
+71
+146
+
+860
+
+467
+
+284
+
+scVI
+362
+Memento
+224
+
+28
+
+13
+
+13
+
+23
+
+14
+
+11
+
+25
+
+14
+
+12
+
+26
+
+15
+
+15
+
+8
+
+142
+
+34
+
+72
+33
+
+135
+222
+
+0.25
+
+88
+
+735
+
+0.75
+
+TPR
+
+0.75
+
+FPR
+
+45
+75
+
+18
+
+12
+
+8
+
+9
+
+52
+
+21
+
+17
+
+8
+
+74
+
+46
+
+19
+
+15
+
+8
+
+8
+
+0.17
+
+0.23
+
+0.3
+
+0.36
+
+0.43
+
+0.49
+
+90
+
+188
+
+347
+
+136
+
+0.03
+
+0.1
+
+0.00
+0.00
+
+0.25
+
+0.50
+
+0.75
+
+1.00
+
+FPR
+
+Pools by average number of reads
+
+Figure 3. ROC curves for detecting gene enrichment in heterogeneous datasets (higher curves are better). The tools computed p-values for enrichment
+across all class-gene pairs (we used bayes_factor for scVI), which were summarized as standard ROC curves, plotting the true-positive rate (TPR)
+against the false-positive rate (FPR). We tested COTAN with DEA (red), Seurat’s function FindAllMarkers in three variants (with default parameters in
+light blue; using SCTransform in medium blue; with the bimodal test variant, recommended by [11], in dark blue), Monocle using top_markers
+function (light purple), Scanpy (default parameters, green), Memento (default parameters, dark purple), and scVI function
+differential_expression (groupby argument, gold). (A) Two cell types dataset in 90%, 10% proportion. (B) Three cell types dataset in 70%,
+20%, 10% proportions. (C) Five cell types in 40%, 30%, 20%, 5%, 5% proportions. In all plots, we performed three replicates on different mixtures and
+merged the p-values from the replicates. (D) Number of true-positive genes detected in panel (C) at FPR = 0.05 (higher values are better). The gene
+counts have been pooled based on the average number of reads of the gene in the dataset (x-axis) and the bars have been normalized to better show
+the detection ratios between the various methods. Since scVI does not compute p-values, it is not present.
+
+well-characterized dataset of seven human lung-cancer cell
+lines [28].
+As shown in Fig. 6, COTAN’s performances are clearly comparable to or better than Seurat in both completeness and
+homogeneity across all resolution levels (see also the Sankey
+diagram with 13 clusters in Supplementary Fig. S4 that illustrates how faithfully COTAN recapitulates the original cell-line
+identities).
+
+Analysis of the CD14 clusters
+Applying the ut clustering approach to the FACS-sorted
+CD14+ dataset [1] we found six clusters: three large, two
+small and one not-ut cluster (consisting of unclustered cells).
+In Fig. 7, we compared the clusters obtained with those
+from Azimuth and CellTypist. We note that both CellTypist and Azimuth analysis detected some small clusters (although their labeling does not fully agree), but both
+
+Downloaded from https://academic.oup.com/nargab/article/8/2/lqag048/8688779 by Dipartimento Di Scienze Della Terra user on 10 July 2026
+
+TPR
+
+0.75
+
+1.00
+
+Distance bin 1
+
+Distance bin 2
+
+Distance bin 3
+
+00% 05% 10% 20% 40% 80%
+
+00% 05% 10% 20% 40% 80%
+
+00% 05% 10% 20% 40% 80%
+
+Distance bin 4
+
+Distance bin 5
+
+Distance bin 6
+
+00% 05% 10% 20% 40% 80%
+
+00% 05% 10% 20% 40% 80%
+
+7
+
+2.0
+
+1.5
+
+Top 1% GDI score of genes
+
+3.5
+
+3.0
+
+2.5
+
+2.0
+
+1.5
+
+00% 05% 10% 20% 40% 80%
+
+Ratio between sizes of second and first cluster
+Figure 4. Variation of the top percentile GDI values of two-population clusters, when the abundance of the second type increases. Starting with the 15
+clusters from the refined La Manno dataset, we formed all 210 ordered pairs, computed their transcriptomic distance as defined in “Use of datasets” in
+Supporting materials and binned the pairs in 6 cluster distance ranges. For each pair, we formed 5 datasets, mixing the first cluster with 5%–80% as
+many cells from the second cluster and computed the top 1% GDI score. The six panels correspond to cluster distance bins, smallest to largest. The
+x-axis represents the number of cells added from the second cluster. The 0% points are the values for the initial clusters without any addition.
+
+grouped all monocytes in a single large cluster. Instead, COTAN
+splits the monocytes into three different clusters. Azimuth
+detected a group of dendritic cells (DC) that both COTAN and
+CellTypist partially assigned to monocyte clusters and partially to a DC cluster.
+Running the COTAN differential expression function
+on the clusters and extracting the significantly enriched
+genes (adjusted p-values < .05) allowed us to assess that
+COTAN cluster 1 is enriched for innate-immune-system genes
+(Supplementary Fig. S11 B), indicating that it can be classified as classical monocytes. This is confirmed by the enrichment of marker genes such as S100A8, TREM1, NLRP12, and
+ITGAM. Clusters 2 and 3 are enriched for antigen-processing
+and presentation genes (Supplementary Fig. S11, reactome
+category “MHC class II antigen presentation”). Although the
+key gene CD16 is not detected in the dataset, other genes (such
+as HLA-DRA) are enriched in both clusters 2 and 3, whereas
+
+ITGAX is enriched only in cluster 2, supporting its identification as intermediate monocytes. Cluster 3, by contrast, is enriched for CD1C and CLEC10A, pointing toward DC-derived
+monocytes; this is consistent with its proximity to the DC cluster in the UMAP plot (see Supplementary Fig. S10).
+A nonclassical monocyte subpopulation does not appear to
+be present. Because these cells express low levels of CD14,
+their absence can be explained by the FACS-sorting procedure
+used to generate the dataset.
+From the gene enrichment analysis, we can also assess that
+clusters 1 and 3 are enriched in genes involved in translation,
+while only cluster 1 is enriched in genes related to ATP production. Unlike the mo-DC-like cluster 3, classical monocytes
+(cluster 1) are known to increase oxidative-phosphorylation
+genes and protein production to meet the ATP demand of
+rapid chemotaxis, phagocytosis and cytokine release, hence
+their unique enrichment for energy-production pathways [48].
+
+Downloaded from https://academic.oup.com/nargab/article/8/2/lqag048/8688779 by Dipartimento Di Scienze Della Terra user on 10 July 2026
+
+Top 1% GDI score of genes
+
+COTAN for scRNA-seq analysis
+
+8
+
+Galfrè et al.
+
+In monocyte-derived dendritic cells (mo-DCs), ribosomal
+activity stays high, but mitochondrial respiration is dialed
+back: the cells switch to glycolysis and actively inhibit oxidative phosphorylation, so translation signatures persist without
+a matching rise in ATP-production genes [49].
+The remaining three clusters have quite small sizes. Cluster 4 has 26 cells and is probably formed by T cells. Cluster 5 and cluster −1 (unclustered cells) formed respectively by
+55 cells and 70 cells, are enriched in DC markers. In particular, the first cluster, enriched in CLEC9A, IRF8, BATF3, and
+XCR1 is probably a cDC1 (conventional type 1) cluster, while
+the second, presenting LILRA4, GZMB, IRF7 and TCF4 is
+probably a pDC (plasmacytoid dendritic cells) cluster.
+In summary, COTAN provides the most biologically informative partition of this CD14 dataset. Unlike CellTypist and Azimuth, which merge all monocytes into a single group, COTAN resolves three transcriptionally and functionally distinct monocyte states (classical, intermediate and
+DC-derived), whose Reactome and marker-gene enrichments
+match their expected biology. The three tools recover more
+or less the same rare lineages (T, B, cDC1 and pDC), but
+discrepancies are confined to cluster boundaries involving
+less than 3% of cells and have little impact on downstream
+interpretation.
+
+Discussion
+In this study, we examined the main features of COTAN and
+demonstrated its advantages for single-cell RNA-sequencing
+analysis. The method embraces a co-expression focused strategy: instead of working with normalized expression levels,
+
+it analyzes the simple presence or absence of transcripts (binarization of read counts). This directly tackles the problem
+of data sparsity. Our benchmarks show clear performance
+gains. Because the workflow removes the need for both normalization and imputation, it avoids the biases and artificial
+dropouts that those steps can introduce, thereby preserving
+genuine biological signals, especially for low-abundance yet
+functionally important genes.
+By summarizing single-cell data analysis with a reliable gene
+correlation matrix, we enable the detection of subtle gene associations and maintain robustness against spurious correlations (Fig. 1).
+Compared to established pipelines, COTAN provides a more
+sensitive and accurate identification of cell population structure and their marker genes. It consistently outperformed
+the other tools in our benchmarks for differential expression
+(marker) detection, achieving higher true-positive rates and
+markedly lower false-positive rates (Figs 2 and 3).
+In clustering analyses, COTAN-derived clusters showed a
+closer alignment with known biological classifications, reflected in superior clustering metrics (ARI, AMI, EC, EH)
+compared to Seurat-based workflows (Fig. 6). For the ut
+clustering, the test performed on a simple case study such
+as the FACS-sorted CD14+ dataset, results in a biologically
+meaningful dataset partitioning that splits the monocytes into
+classical, intermediate and DC-derived monocytes. The ut
+method lays the foundation for a new approach to clustering
+focused on a biologically grounded cell partitioning.
+These improvements are not merely numerical: they translate into clearer biological insights. For example, COTAN was
+able to discriminate fine-grained cell subtypes (such as distinct
+
+Downloaded from https://academic.oup.com/nargab/article/8/2/lqag048/8688779 by Dipartimento Di Scienze Della Terra user on 10 July 2026
+
+Figure 5. Test accuracy of logistic regression for several datasets. Each dataset is the union of two pure clusters, also corresponding to the labels to
+predict. The six datasets on the left are UT or nearly so, according to COTAN (with negative values of distance from UT, on top of the chart). The six on the
+right are far from the UT condition (large positive values). Gray dots (below) represent the baseline accuracy of a random classifier. Red dots (above)
+report the accuracy of a prediction based on the 100 top highly variable genes in each dataset. To properly evaluate the model’s generalization error, we
+applied leave-one-out cross-validation (LOOCV).
+
+COTAN for scRNA-seq analysis
+
+AMI
+
+9
+
+ARI
+
+0.90
+
+0.9
+
+0.85
+0.8
+
+0.80
+
+0.7
+
+value
+
+0.70
+10
+
+11
+
+12
+
+13
+
+14
+
+15
+
+10
+
+11
+
+12
+
+EC
+
+13
+
+14
+
+15
+
+13
+
+14
+
+15
+
+EH
+
+0.90
+0.85
+
+0.92
+
+0.80
+
+0.90
+
+0.75
+
+0.88
+
+0.70
+0.86
+10
+
+11
+
+12
+
+13
+
+14
+
+15
+
+10
+
+11
+
+12
+
+N.cl
+Method
+
+COTAN
+
+Seurat_SCTr
+
+Seurat
+
+Figure 6. Comparison of COTAN clustering (red), Seurat standard (light blue), and SeuratSCTransform clustering (blue) on the Arigoni cell lines
+dataset. All methods were tuned to produce the same number of clusters (10–15). Performance is assessed by adjusted mutual information, adjusted
+Rand index, entropy-based completeness, and entropy-based homogeneity (using Poem package [47]). The x-axis shows the number of clusters
+generated; the y-axis, the metric score (higher is better).
+
+monocyte subsets in Fig. 7) that other methods had conflated,
+highlighting genes and pathways that define those subpopulations (Supplementary Fig. S11).
+We must also acknowledge several limitations of COTAN
+that temper these advancements.
+First, COTAN lacks built-in mechanisms for batch effect
+correction or dataset integration. This is a significant concern for multi-sample studies, where technical differences between runs or subjects must be accounted for. Because our
+framework operates on raw counts and treats each dataset
+as is, differences in sequencing depth or protocol could potentially confound the co-expression analysis. Some literature suggests that working with raw counts diminishes the
+need for batch correction (arguing that major differences reflect biology rather than technical bias). We plan to investigate whether this holds true under a variety of conditions for
+COTAN. Nonetheless, we recognize that a robust solution for
+integrating across batches (perhaps via modeling latent factors or extending the contingency table approach to multiple datasets) will greatly enhance COTAN’s utility in large-scale
+projects. Until then, users might need to apply external batch
+correction heuristics or limit COTAN analyses to within-batch
+comparisons.
+Secondly, the interpretation of COTAN’s results requires an
+understanding of its novel metrics. While we have provided visualization tools and documentation, there is a learning curve
+
+in thinking about gene–gene co-expression significance and
+the gdi, as opposed to more familiar concepts like fold-change
+or cluster-average expression. We encourage users to use the
+plotting functions (e.g. co-expression heatmaps, gdi distributions) to build intuition about these outputs.
+Lastly, because COTAN operates on binarized read counts,
+it can be less sensitive to changes in expression magnitude
+among highly expressed genes. In particular, when a gene is
+detected in all or nearly all cells, the model may not flag
+it as differentially expressed even if sub-populations exhibit
+large log-fold changes. In ongoing development of the probabilistic framework, we will evaluate strategies to mitigate this
+limitation.
+A future avenue is extending COTAN’s concepts to multimodal data (for example, integrating single-cell ATAC-seq coaccessibility with RNA-seq co-expression, to identify regulatory networks)—though this is speculative, the contingency
+table framework could, in theory, be generalized to binary
+events beyond gene expression presence/absence.
+Finally, continued benchmarking on diverse datasets (including those with known ground truths or well-annotated
+cell types) will be important. The fact that COTAN tends
+to better adjust to sparsity and low-count genes is an advantage that could result in better ability to detect rare
+cell types or to handle heterogeneous tissues (we have already seen a better resolution for detecting fine-grained cell
+
+Downloaded from https://academic.oup.com/nargab/article/8/2/lqag048/8688779 by Dipartimento Di Scienze Della Terra user on 10 July 2026
+
+0.75
+
+10
+
+Galfrè et al.
+
+other
+NK
+
+pDC
+Tcm/Naive helper T cells
+
+cDC1
+
+DC
+
+T cells
+
+Mono
+Classical monocytes
+DC−derived Monocytes
+
+Classical Monocytes
+
+DC
+CD8 T
+CD4 T
+B
+
+B cells
+
+CellTypist
+
+COTAN
+
+Azimuth
+
+Figure 7. Sankey plot for clusters obtained by COTAN (center), by CellTypist (left), and by Azimuth (right, predicted.celltype.l1). CellTypist detects
+four clusters: one large classical monocytes (2409 cells) and three small clusters of DC (141 cells), Tcm/Naive helper T cells (26 cells) and B cells (19).
+Azimuth instead, detects seven clusters but two are just a single cell clusters (CD8 T and NK). The others are monocytes (2366 cells), DC (183), B cells
+(18), CD4 T cells (11), other cells (15), CD8 T cells (1), and NK cells (1). In the original paper describing this dataset, these small clusters were classified
+as DC while both CellTypist and Azimuth do not agree completely. Also COTAN detects six clusters: classical monocytes (cluster 1) 1110 cells,
+intermediate monocytes (cluster 2) 1139 cells, DC-derived monocytes (cluster 3), 195 cells, T cells (cluster 4) 26 cells, cDC1 (cluster 5), 55 cells and pDC
+(the cluster −1, unclustered cells) formed by 70 cells.
+
+subtypes in Fig. 7). These scenarios will be investigated in future work.
+While COTAN showed clear advantages in our tests, every method has scenarios where it excels or falters. Ongoing evaluations will help identify such scenarios–for instance,
+how does COTAN perform on extremely large cell atlases, or
+on datasets with very low sequencing depth? Gathering this
+knowledge will guide further optimizations and inform users
+about when COTAN is the method of choice.
+In conclusion, COTAN represents a significant advancement
+in single-cell transcriptomics analysis, offering an innovative
+approach that complements, and in many aspects enhances,
+existing methods. Its focus on gene co-expression and careful
+statistical treatment of sparse data allows it to uncover biological patterns that might otherwise remain hidden, thereby
+enriching the interpretation of cellular heterogeneity. We have
+shown that it achieves state-of-the-art performance in gene
+correlation accuracy, differential gene expression detection
+and cell clustering, underscoring its potential to become a
+valuable component of single-cell analysis workflows. By addressing its current limitations and expanding its toolkit, we
+anticipate that future iterations of COTAN will further empower researchers to dissect complex single-cell datasets, ultimately leading to deeper insights into gene regulation and cell
+identity at the single-cell level.
+
+Writing—original draft [equal], Writing—review & editing [equal]), Marco Fantozzi (Conceptualization [equal],
+Methodology [equal], Software [equal], Validation [lead], Visualization [equal], Writing—original draft [equal], Writing—
+review & editing [equal]), Alina Sîrbu (Methodology [equal],
+Supervision [supporting], Writing—review & editing [equal]),
+Irene Testa (Data curation [equal], Methodology [supporting], Validation [supporting], Writing—review & editing
+[equal]), Matteo Tolloso (Data Curation [lead], Validation [supporting], Writing—review & editing [equal]), Andrea Alberti (Data curation [equal], Validation [supporting], Writing—review & editing [equal]), Corrado Priami
+(Methodology [equal], Supervision [equal], Writing—review
+& editing [equal]), and Francesco Morandin (Conceptualization [equal], Formal analysis [lead], Investigation [equal],
+Methodology [equal], Supervision [equal], Writing—original
+draft [equal], Writing—review & editing [equal]).
+
+Supplementary data
+Supplementary data is available at NAR Genomics & Bioinformatics online.
+
+Conflict of interest
+None declared.
+
+Acknowledgements
+Author contributions: Silvia Giulia Galfrè (Conceptualization [equal], Funding acquisition [equal], Methodology [lead],
+Software [lead], Validation [lead], Visualization [equal],
+
+Funding
+This work was supported in part by a NARSAD Young
+Investigator Grant from Brain and Behavior Research
+
+Downloaded from https://academic.oup.com/nargab/article/8/2/lqag048/8688779 by Dipartimento Di Scienze Della Terra user on 10 July 2026
+
+Intermediate Monocytes
+
+COTAN for scRNA-seq analysis
+
+Data availability
+COTAN is available on GitHub, https://github.com/seriph78/
+COTAN, or as Bioconductor package: Silvia Giulia G,
+Francesco M, Marco F, Marco P, Daniel P, Corrado P, Federico C, Manuela H (2026). COTAN: COexpression Tables ANalysis, doi:10.18129/B9.bioc.COTAN, R package version 2.10.3, https://bioconductor.org/packages/COTAN. Supplementary data are available at https://seriph78.github.io/
+COTAN_Datasets_analysis/. All analysis and code used in this
+work are available at these sites.
+
+References
+1. Zheng GX, Terry JM, Belgrader P et al. Massively parallel digital
+transcriptional profiling of single cells. Nat Commun
+2017;8:14049. https://doi.org/10.1038/ncomms14049
+2. Macosko EZ, Basu A, Satija R et al. Highly parallel genome-wide
+expression profiling of individual cells using nanoliter droplets.
+Cell 2015;161:1202–14.
+https://doi.org/10.1016/j.cell.2015.05.002
+3. Klein AM, Mazutis L, Akartuna I et al. Droplet barcoding for
+single-cell transcriptomics applied to embryonic stem cells. Cell
+2015;161:1187–201. https://doi.org/10.1016/j.cell.2015.04.044
+4. Islam S, Zeisel A, Joost S et al. Quantitative single-cell RNA-seq
+with unique molecular identifiers. Nat Methods 2014;11:163–6.
+https://doi.org/10.1038/nmeth.2772
+5. Andrews TS, Kiselev VY, McCarthy D et al. Tutorial: guidelines
+for the computational analysis of single-cell RNA sequencing data.
+Nat Protoc 2021;16:1–9.
+https://doi.org/10.1038/s41596- 020- 00409- w.
+6. Hie B, Peters J, Nyquist SK et al. Computational methods for
+single-cell RNA sequencing. Annu Rev Biomed Data Sci
+2020;3:339–64.
+https://doi.org/10.1146/annurev- biodatasci- 012220- 100601
+7. Amezquita RA, Lun ATL, Becht E et al. Orchestrating single-cell
+analysis with Bioconductor. Nat Methods 2020;17:137–45.
+https://doi.org/10.1038/s41592- 019- 0654- x
+8. Luecken MD, Theis FJ. Current best practices in single-cell
+RNA-seq analysis: a tutorial. Mol Syst Biol 2019;15:e8746.
+https://doi.org/10.15252/msb.20188746
+9. Hicks SC, Townes FW, Teng M et al. Missing data and technical
+variability in single-cell RNA-sequencing experiments. Biostatistics
+2018;19:562–78. https://doi.org/10.1093/biostatistics/kxx053
+10. Lähnemann D, Köster J, Szczurek E et al. Eleven grand challenges
+in single-cell data science. Genome Biol 2020;21:1–35.
+11. Soneson C, Robinson MD. Bias, robustness and scalability in
+single-cell differential expression analysis. Nat Methods
+2018;15:255–61. https://doi.org/10.1038/nmeth.4612
+12. Pokhilko A, Handel AE, Curion F et al. Targeted single-cell RNA
+sequencing of transcription factors enhances the identification of
+cell types and trajectories. Genome Res 2021;31:1069–81.
+https://doi.org/10.1101/gr.273961.120
+13. Trapnell C, Cacchiarelli D, Grimsby J et al. The dynamics and
+regulators of cell fate decisions are revealed by pseudotemporal
+
+ordering of single cells. Nat Biotechnol 2014;32:381–6.
+https://doi.org/10.1038/nbt.2859
+14. Qiu X, Mao Q, Tang Y et al. Reversed graph embedding resolves
+complex single-cell trajectories. Nat Methods 2017;14:979–82.
+https://doi.org/10.1038/nmeth.4402
+15. Satija R, Farrell JA, Gennert D et al. Spatial reconstruction of
+single-cell gene expression data. Nat Biotechnol 2015;33:495–502.
+https://doi.org/10.1038/nbt.3192
+16. Hao Y, Stuart T, Kowalski MH et al. Dictionary learning for
+integrative, multimodal and scalable single-cell analysis. Nat
+Biotechnol 2023;42:1–12.
+17. Wolf FA, Angerer P, Theis FJ. SCANPY: large-scale single-cell gene
+expression data analysis. Genome Biol 2018;19:1–5.
+https://doi.org/10.1186/s13059- 017- 1382- 0
+18. Svensson V. Droplet scRNA-seq is not zero-inflated. Nat
+Biotechnol 2020;38:147–50.
+https://doi.org/10.1038/s41587- 019- 0379- 5
+19. Vallejos CA, Marioni JC, Richardson S. BASiCS: Bayesian analysis
+of single-cell sequencing data. PLoS Comput Biol
+2015;11:e1004333. https://doi.org/10.1371/journal.pcbi.1004333
+20. Lopez R, Regier J, Cole MB et al. Deep generative modeling for
+single-cell transcriptomics. Nat Methods 2018;15:1053–8.
+https://doi.org/10.1038/s41592- 018- 0229- 2
+21. Grobecker P, Sakoparnig T, van Nimwegen E. Identifying cell
+states in single-cell RNA-seq data at statistically maximal
+resolution. PLOS Comput Biol 2024;20:1–21.
+https://doi.org/10.1371/journal.pcbi.1012224
+22. Townes FW, Hicks SC, Aryee MJ et al. Feature selection and
+dimension reduction for single-cell RNA-Seq based on a
+multinomial model. Genome Biol 2019;20:1–16.
+https://doi.org/10.1186/s13059- 019- 1861- 6
+23. Galfre SG, Morandin F, Pietrosanto M et al. COTAN: scRNA-seq
+data analysis based on gene co-expression. NAR Genom
+Bioinform 2021;3:lqab072.
+https://doi.org/10.1093/nargab/lqab072
+24. Dunville K, Tonelli F, Novelli E et al. Laminin 511 and WNT
+signalling sustain prolonged expansion of hiPSC-derived
+hippocampal progenitors. Development 2022;149:dev200353.
+https://doi.org/10.1242/dev.200353
+25. Martins M, Galfrè S, Terrigno M et al. A eutherian-specific
+microRNA controls the translation of Satb2 in a model of cortical
+differentiation. Stem Cell Rep 2021;16:1496–509.
+https://doi.org/10.1016/j.stemcr.2021.04.020
+26. Taliani V, Buonaiuto G, Desideri F et al. The long noncoding RNA
+Charme supervises cardiomyocyte maturation by controlling cell
+differentiation programs in the developing heart. eLife
+2023;12:e81360. https://doi.org/10.7554/eLife.81360
+27. Galfrè S, Fantozzi M. COTAN V2.0 datasets analysis. 2023.
+https://seriph78.github.io/COTAN_Datasets_analysis/ (June 2024,
+date last accessed).
+28. Arigoni M, Ratto ML, Riccardo F et al. A single cell RNAseq
+benchmark experiment embedding ‘controlled’ cancer
+heterogeneity. Sci Data 2024;11:159.
+https://doi.org/10.1038/s41597- 024- 03002- y
+29. Yuzwa SA, Borrett MJ, Innes BT et al. Developmental emergence
+of adult neural stem cells as revealed by single-cell transcriptional
+profiling. Cell Rep 2017;21:3970–86.
+https://doi.org/10.1016/j.celrep.2017.12.017
+30. Loo L, Simon JM, Xing L et al. Single-cell transcriptomic analysis
+of mouse neocortical development. Nat Commun 2019;10:134.
+https://doi.org/10.1038/s41467- 018- 08079- 9
+31. Ding J, Adiconis X, Simmons SK et al. Systematic comparison of
+single-cell and single-nucleus RNA-sequencing methods. Nat
+Biotechnol 2020;38:737–46.
+https://doi.org/10.1038/s41587- 020- 0465- 8
+32. Kiani Shabestari S, Morabito S, Danhash E et al. Absence of
+microglia promotes diverse pathologies and early lethality in
+Alzheimer’s disease mice. Cell Rep 2022;39:110961.
+https://doi.org/10.1016/j.celrep.2022.110961
+
+Downloaded from https://academic.oup.com/nargab/article/8/2/lqag048/8688779 by Dipartimento Di Scienze Della Terra user on 10 July 2026
+
+Foundation (no. 31649), by the University of Pisa through
+the SPARK project. A.S. acknowledges support from the European Union, Next Generation EU, in the context of the
+National Recovery and Resilience Plan, Mission 4 Component 2, Investment 1.1, Call PRIN 2022 D.D. 104 02-022022–MEDICA Project, CUP I53D23003720006. This work
+was also supported in part by project “Hub multidisciplinare
+e interregionale di ricerca e sperimentazione clinica per il contrasto alle pandemie e all’antibioticoresistenza (PAN-HUB)”
+funded by the Italian Ministry of Health (POS 2014–2020,
+project ID: T4-AN-07, CUP: I53C22001300001).
+
+11
+
+12
+
+Galfrè et al.
+41. Gayoso A, Lopez R, Xing G et al. A Python library for
+probabilistic analysis of single-cell omics data. Nat Biotechnol
+2022;40:163–6. https://doi.org/10.1038/s41587- 021- 01206- w
+42. Karlsson M, Zhang C, Méar L et al. A single–cell type
+transcriptomics map of human tissues. Sci Adv 2021;7:eabh2169.
+https://doi.org/10.1126/sciadv.abh2169
+43. Hao Y, Hao S, Andersen-Nissen E et al. Integrated analysis of
+multimodal single-cell data. Cell 2021;184:3573–87.
+https://doi.org/10.1016/j.cell.2021.04.048
+44. Conde CD, Xu C, Jarvis LB et al. Cross-tissue immune cell analysis
+reveals tissue-specific features in humans. Science
+2022;376:eabl5197. https://doi.org/10.1126/science.abl5197
+45. Szklarczyk D, Gable AL, Nastou KC et al. The STRING database
+in 2021: customizable protein–protein networks, and functional
+characterization of user-uploaded gene/measurement sets. Nucleic
+Acids Res 2021;49:D605–12.
+https://doi.org/10.1093/nar/gkaa1074
+46. Szklarczyk D, Kirsch R, Koutrouli M et al. The STRING database
+in 2023: protein–protein association networks and functional
+enrichment analyses for any sequenced genome of interest. Nucleic
+Acids Res 2023;51:D638–46.
+https://doi.org/10.1093/nar/gkac1000
+47. Luo S, Germain P. poem: POpulation-based Evaluation Metrics. V
+1.1.7. poem. 2025. https://doi.org/10.18129/B9.bioc.poem
+48. Ravi S, Mitchell T, Kramer PA et al. Mitochondria in monocytes
+and macrophages-implications for translational and basic
+research. Int J Biochem Cell Biol 2014;53:202–7.
+https://doi.org/10.1016/j.biocel.2014.05.019
+49. Zhao Y, Gao C, Liu L et al. The development and function of
+human monocyte-derived dendritic cells regulated by metabolic
+reprogramming. J Leukocyte Biol 2023;114:212–22.
+https://doi.org/10.1093/jleuko/qiad062
+
+Received: August 12, 2025. Revised: April 15, 2026. Accepted: April 20, 2026
+© The Author(s) 2026. Published by Oxford University Press.
+This is an Open Access article distributed under the terms of the Creative Commons Attribution-NonCommercial License (https://creativecommons.org/licenses/by-nc/4.0/), which permits
+non-commercial re-use, distribution, and reproduction in any medium, provided the original work is properly cited. For commercial re-use, please contact reprints@oup.com for reprints and
+translation rights for reprints. All other permissions can be obtained through our RightsLink service via the Permissions link on the article page on our site—for further information please contact
+journals.permissions@oup.com.
+
+Downloaded from https://academic.oup.com/nargab/article/8/2/lqag048/8688779 by Dipartimento Di Scienze Della Terra user on 10 July 2026
+
+33. Tasic B, Menon V, Nguyen TN et al. Adult mouse cortical cell
+taxonomy revealed by single cell transcriptomics. Nat Neurosci
+2016;19:335–46. https://doi.org/10.1038/nn.4216
+34. Luecken MD, Gigante S, Burkhardt DB et al. Defining and
+benchmarking open problems in single-cell analysis. Nat
+Biotechnol 2025;43:1035–40.
+https://doi.org/10.1038/s41587- 025- 02694- w
+35. La Manno G, Siletti K, Furlan A et al. Molecular architecture of
+the developing mouse brain. Nature 2021;596:92–6.
+https://doi.org/10.1038/s41586- 021- 03775- x
+36. Brown D, da Veiga Beltrame E, Park JH et al.. Single-cell RNA
+sequencing of 76,535 capillary PBMCs from 3 donors across 28
+samples, freshly isolated or on ice for 24h with manual 4-layer
+annotation hierarchy. Version 1.0. Zenodo. 2023.
+https://doi.org/10.5281/zenodo.8020792
+37. Su C, Xu Z, Shan X et al. Cell-type-specific co-expression
+inference from single cell RNA-sequencing data. Nat Commun
+2023;14:4846. https://doi.org/10.1038/s41467- 023- 40503- 7
+38. Aibar S, González-Blas CB, Moerman T et al. SCENIC: single-cell
+regulatory network inference and clustering. Nat Methods
+2017;14:1083–6. https://doi.org/10.1038/nmeth.4463
+39. Hounkpe BW, Chenou F, De Lima F et al. HRT Atlas v1. 0
+database: redefining human and mouse housekeeping genes and
+candidate reference transcripts by mining massive RNA-seq
+datasets. Nucleic Acids Res 2021;49:D947–55.
+https://doi.org/10.1093/nar/gkaa609
+40. Kim MC, Gate R, Lee DS et al. Method of moments framework
+for differential expression analysis of single-cell RNA sequencing
+data. Cell 2024;187:6393–410.
+https://doi.org/10.1016/j.cell.2024.09.044
+
+

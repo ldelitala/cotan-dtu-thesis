@@ -1,0 +1,22 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "Build Thesis (pdflatex)",
+            "type": "shell",
+            "command": "pdflatex -interaction=nonstopmode main.tex",
+            "group": "build",
+            "problemMatcher": ["$tex"],
+            "presentation": {
+                "reveal": "always"
+            }
+        },
+        {
+            "label": "Build Thesis (xelatex)", 
+            "type": "shell",
+            "command": "xelatex -interaction=nonstopmode main.tex",
+            "group": "build",
+            "problemMatcher": ["$tex"]
+        }
+    ]
+}

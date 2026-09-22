@@ -1,0 +1,31 @@
+\chapter{Conclusioni}
+
+Questa tesi ha stabilito che il quadro a tabelle di contingenza di COTAN, robusto alla sparsità, può essere esteso all'analisi a livello di trascritto, recuperando pattern di esclusività all'interno di un gene che indicano un uso differenziale dei trascritti (DTU) a partire da dati sparsi di \gls{rnaSeq} a singola cellula $3'$-biased. L'intuizione chiave---che i pattern di zeri portano segnale affidabile anche in matrici estremamente rade---si trasferisce con successo dalla co-espressione genica al rilevamento dell'\gls{mutualExclusivity} tra isoforme.
+
+\section{Sintesi dei risultati}
+
+Applicato ai due dataset a goccia, il quadro adattato ha restituito segnale rilevabile in entrambi: 430 geni umani portavano una coppia di isoforme significativamente mutuamente esclusive, con 21 candidati che superavano il filtro a contrasto bidirezionale, e 46 candidati murini che passavano alla soglia più bassa. Le chiamate più forti---TPM1 nella miscela di linee cellulari, Meg3 e Malat1 nella corteccia murina---sono coerenti con la biologia delle isoforme documentata \cite{ghanam2023malat1, xue2012specialized}, e la maggior parte è sopravvissuta allo scambio della strategia di clustering, quindi il segnale non dipende da un particolare schema di partizione.
+
+\section{Implicazioni più ampie}
+
+Questo lavoro ha implicazioni in tre ambiti:
+
+\textbf{Per la genomica computazionale}: il successo delle statistiche a tabelle di contingenza a risoluzione di trascritto dimostra che la sparsità non deve essere trattata come un problema da superare (tramite imputazione o trasformazione logaritmica), ma piuttosto da modellare direttamente. Questa filosofia può estendersi ad altre sfide a singola cellula---espressione allele-specifica, co-occorrenza di picchi di accessibilità della cromatina e integrazione multi-modale.
+
+\textbf{Per la biologia delle isoforme}: rilevare la DTU nei dati $3'$-biased apre nuove opportunità di analisi per dataset su larga scala già esistenti (per esempio Human Cell Atlas e Tabula Sapiens\defn{Human Cell Atlas / Tabula Sapiens}{Grandi atlanti di riferimento internazionali di trascrittomi a singola cellula in tessuti umani, basati su dati a goccia $3'$-biased e quindi chiusi alle domande a livello di isoforma.}) che erano precedentemente preclusi alle domande a livello di isoforma. Sebbene la sensibilità resti limitata rispetto ai protocolli full-length, il compromesso tra numero di cellule e copertura può favorire i metodi a goccia quando la potenza statistica di migliaia di cellule supera la profondità per cellula.
+
+\textbf{Per lo sviluppo del framework COTAN}: questa tesi conferma che i principi di progettazione di COTAN---la modellazione diretta dei conteggi nulli e la calibrazione $\chi^2$ dei $p$-value su grandi $N$---si generalizzano oltre l'analisi a livello genico. Estensioni future ad altre modalità a singola cellula (co-occorrenza di picchi ATAC-seq\defn{ATAC-seq}{Assay for Transposase-Accessible Chromatin: mappa le regioni del genoma in cui la cromatina è aperta, indicando attività regolatoria.} e correlazioni di abbondanza proteica in CITE-seq\defn{CITE-seq}{Un protocollo che misura simultaneamente RNA e proteine di superficie nelle stesse singole cellule, abilitando l'analisi multi-modale.}) appaiono praticabili.
+
+\section{Limiti e lavoro futuro}
+
+I vincoli su questi risultati---invisibilità dovuta al bias $3'$, assenza di validazione ortogonale, soglia euristica $\tau$ e arrotondamento dell'EM---sono esposti insieme alle direzioni che aprono nella Sezione~\ref{sec:discussion}. Lo stesso compromesso di fondo li governa tutti e quattro: la sensibilità si compra con le cellule anziché con la copertura, quindi il valore del metodo cresce con i dataset.
+
+Un quantificatore più recente punta nella stessa direzione. SCALPEL\cite{ake2025scalpel} costruisce la matrice di trascritti da dati $3'$-based standard seguendo una via diversa dal passo EM usato qui, e i suoi autori riportano sensibilità superiore e un recupero più fedele delle reali proporzioni di isoforme rispetto agli strumenti esistenti, con validazione sperimentale. Sostituirlo a \texttt{parsimony-em} verificherebbe se le chiamate di DTU a valle diventano più nitide, il che lo rende un'estensione naturale di questo quadro.
+
+\section*{Considerazioni finali}
+
+Questa tesi dimostra che COTAN a livello di trascritto può rivelare programmi regolatori nascosti alle analisi centrate sui geni. Il quadro a tabelle di contingenza fornisce un approccio rigoroso all'analisi di dati sparsi---un approccio che rispetta il processo di misura reale anziché imporre trasformazioni pensate per dati densi e distribuiti normalmente.
+
+Il cammino futuro richiede validazione ortogonale e le tecnologie complementari indicate nella Sezione~\ref{sec:discussion} perché i metodi isoform-aware a singola cellula passino dalla prova di fattibilità alla pratica standard.
+
+Il quadro stabilito qui fornisce una base per quel lavoro futuro---combinando rigore metodologico (statistiche a tabelle di contingenza), riproducibilità computazionale (pipeline Nextflow documentata) e validazione biologica (allineamento con switch di isoforma noti). Che venga applicato alla neurogenesi, all'evoluzione del cancro o alla biologia dello sviluppo, la domanda di fondo resta la stessa: \textit{quali trascritti esprimono le cellule, e come cambia questa scelta tra condizioni diverse?}

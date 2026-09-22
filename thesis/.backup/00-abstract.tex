@@ -1,0 +1,10 @@
+\chapter*{Abstract}
+\addcontentsline{toc}{chapter}{Abstract}
+
+Single-cell RNA sequencing has transformed the study of cellular heterogeneity, yet widely adopted droplet-based protocols capture only the $3'$ end of each transcript \cite{conte2024opportunities}. This constraint makes Differential Transcript Usage (DTU) difficult to detect, as short terminal reads lack the internal splice junctions required to distinguish isoforms. Furthermore, proportion-based DTU methods---including those extended to single-cell data, which rely on pseudo-bulk aggregation---sacrifice cell-level resolution to recover the read depth they require \cite{gilis2021satuRn, patrick2020sierra}.
+
+This thesis investigates whether COTAN---a statistical framework that models zero counts directly through presence/absence contingency tables \cite{galfre2021cotan}---can be extended from gene-level co-expression to transcript-level DTU detection. By bypassing both artificial imputation and pseudo-bulk aggregation, the adapted method identifies mutually exclusive isoform pairs via independence testing and bidirectional contrast thresholds across cell clusters.
+
+A reproducible Nextflow pipeline was built to construct transcript-level matrices from raw $3'$-biased data using alevin-fry with identity transcript-to-gene mapping \cite{he2022alevin}. This pipeline was applied to a human cell line mixture (29{,}000 cells) and mouse brain tissue (4{,}000 cells). Transcript-level clustering successfully recovered fine-grained substructures consistent with the Global Differentiation Index, and top DTU candidates---including Meg3, Malat1, and TPM1---were consistent with documented isoform biology \cite{joglekar2023words}.
+
+These results demonstrate that sparsity-robust, contingency-table statistics can detect isoform mutual exclusivity in droplet-based data without the prohibitive cost of full-length sequencing. While sensitivity remains bounded by positional bias---rendering mid-transcript splicing events invisible---and orthogonal validation is still required, this work establishes a principled path for isoform-aware analysis on large-scale atlas datasets.

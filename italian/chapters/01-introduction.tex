@@ -1,0 +1,66 @@
+\chapter{Introduction}
+
+\section{Context and Motivation}
+\setlength{\parskip}{0.5\baselineskip}
+Functional specialization in multicellular organisms arises from cellular heterogeneity—the existence of distinct cell types and states within a single organism. Although somatic cells generally share a foundational genome, differential gene expression and epigenetic regulation allow for the selective interpretation of genetic information across diverse lineages. 
+
+This diversity is profoundly amplified at the transcript level because a single gene can encode multiple distinct RNA variants, or isoforms, which frequently exhibit divergent functional properties. Consequently, transcriptional regulation must be evaluated across two critical dimensions: gene expression magnitude (total transcript abundance per gene) and transcript identity (which specific isoform is produced).
+
+RNA sequencing (RNA-seq) quantifies transcriptional activity through the conversion of mRNA molecules into short sequence fragments (reads). Early RNA-seq protocols aggregated these signals across entire cell populations—an approach termed bulk RNA-seq—which inherently obscured cellular heterogeneity. The subsequent development of single-cell RNA sequencing (scRNA-seq) technology allowed for measurement at single-cell resolution by profiling thousands of individual cells simultaneously, revealing expression dynamics in each cell rather than averaging across tissue samples.
+
+However, the field currently faces a pervasive trade-off. To cost-effectively profile massive cell populations—often tens to hundreds of thousands of cells per experiment—the most widely adopted scRNA-seq protocols rely on 3'-biased sequencing. These methods capture only the extreme 3' ends of mRNA molecules. Conversely, full-length scRNA-seq protocols (such as Smart-seq) successfully capture complete transcript structures, but their reliance on labor-intensive, plate-based logistics and high sequencing costs typically restricts their throughput to mere hundreds or a few thousand cells.
+
+Although capturing only the 3' terminus makes it difficult to distinguish between distinct isoforms, this short sequence provides sufficient information to accurately identify the parent gene of origin. This ability to quantify total gene abundance across massive cell populations allows researchers to filter through thousands of baseline transcripts and pinpoint exactly which genes are actively shifting their behavior.
+
+This analytical process is formalized through Differential Expression (DE) analysis. By statistically comparing total gene abundance between different cell populations, DE identifies which specific genes are significantly upregulated or downregulated. As the cornerstone of modern transcriptomic studies, DE leverages high-throughput 3'-biased data to cut through genomic noise and isolate the molecular drivers of a condition—enabling researchers to discover diagnostic biomarkers, define complex disease signatures, and track therapeutic responses.
+
+Yet relying exclusively on gene-level DE analysis creates a significant biological blind spot: it assumes that total transcript abundance alone dictates functional output. In reality, a gene's total expression can remain perfectly constant while its underlying isoform composition shifts dramatically. Because different isoforms frequently encode proteins with distinct—or even functionally antagonistic—properties, simply swapping one isoform for another can fundamentally alter cell behavior. Standard DE analysis registers this as "no change," missing a crucial regulatory event entirely.
+
+Differential Transcript Usage (DTU) analysis solves this by investigating whether the relative proportions of specific isoforms shift between conditions or cell types, independent of overall gene expression. For instance, a healthy cell might express two distinct isoforms of a gene in equal amounts, while a diseased cell might shift to producing almost entirely just one. Even if the total expression of the parent gene remains exactly the same, this internal shift can fundamentally alter the cell's biological function.
+
+Yet, implementing DTU analysis on a large scale remains a major bottleneck in the field. The fundamental problem is that short 3' reads cannot confidently resolve complex transcripts. Because these protocols capture only the extreme tail end of the mRNA molecule, they miss the internal splice junctions where alternative splicing actually occurs. This lack of resolution is precisely what necessitates the gene-level summation discussed earlier—an aggregation that completely obscures any underlying structural variation. Consequently, the vital regulatory dynamics that DTU could uncover remain completely hidden within standard scRNA-seq datasets.
+\setlength{\parskip}{0pt}
+
+\section{The Computational Challenge}
+Recovering DTU from 3'-biased single-cell RNA-seq data faces two fundamental computational obstacles:
+
+\begin{itemize}
+    \item \textbf{Extreme Sparsity:} Count matrices exhibit zero entries typically exceeding 70–90\% of all values. These zeros arise from both true biological absence and technical dropouts (capture or sequencing failures). Standard statistical methods assume continuous distributions; they cannot distinguish between these zero types and fail to model them accurately.
+    
+    \item \textbf{Positional Bias:} High-throughput droplet assays capture primarily transcript ends. This means the data lacks internal read coverage across the transcript body—exactly what is required for isoform disambiguation. When multiple complex variants share identical 3' terminal exons, pseudoalignment tools produce massive read-assignment ambiguity.
+\end{itemize}
+
+A novel statistical framework is required—one capable of extracting regulatory signals from heavily zero-inflated distributions while working with incomplete transcript coverage.
+
+\section{Current Approaches and Limitations}
+Existing computational solutions fall into four categories—each requiring significant methodological compromises:
+
+\begin{itemize}
+    \item \textbf{Full-Length Protocols:} Workflows utilizing full-length scRNA-seq (such as Smart-seq) capture complete transcript structures, enabling robust isoform-switching tools like IsoformSwitchAnalyzeR. However, as mentioned in Section 1.1, their labor-intensive logistics and sequencing costs restrict throughput to hundreds or a few thousand cells, precluding population-level studies.
+    
+    \item \textbf{Bulk-Adapted Algorithms:} Established methods originally designed for bulk RNA-seq (rMATS, SUPPA2, DRIMSeq, DEXSeg) rely on continuous proportion modeling and deep internal read coverage. Applied directly to sparse 3'-biased single-cell data, the low per-cell sequencing depth produces degenerate estimates that cause these models to fail entirely.
+    
+    \item \textbf{Pseudo-Bulk Aggregation:} To recover sufficient read depth for traditional algorithms, researchers frequently aggregate cells into "pseudo-bulk" profiles. While this approach yields more information than standard bulk analysis, it still represents a massive loss of the fine-grained heterogeneity that single-cell sequencing was designed to capture.
+    
+    \item \textbf{Targeted 3'-Biased Tools:} Recently emerged frameworks for droplet data (Sierra, MANTA) focus on narrow phenomena like alternative polyadenylation or population-level ratios rather than providing a generalized framework for detecting isoform switching from zero-inflated matrices.
+\end{itemize}
+
+Consequently, the field lacks a sparsity-robust statistical framework capable of detecting isoform switches at true single-cell resolution without prohibitive sequencing costs.
+
+\section{Thesis Objective}
+This thesis is born as a direct consequence of the recent publication of the COTAN (Co-expression Tables Analysis) framework. Designed specifically to handle extreme sparsity, COTAN demonstrated superior performance compared to other frameworks on highly sparse gene-level matrices. This success raised a natural question: could it work even better—or at least adequately—on transcript-level matrices, which are inherently sparser than their gene-level counterparts?
+
+COTAN is adapted in this work to operate at transcript resolution rather than its traditional gene-level application. The practical consequence is straightforward: by avoiding artificial imputation and bypassing gene-level or pseudo-bulk aggregation, the approach preserves cell-to-cell heterogeneity that standard pipelines discard. However, it does not solve the positional bias problem itself—transcripts with identical 3' ends remain indistinguishable. The adaptation instead asks a more modest question: can COTAN detect DTU on the subset of transcripts where isoform differences are evident at the 3' end? Even this constrained scope represents meaningful progress, as it demonstrates whether sparsity-robust statistical pathways exist for detecting isoform switches in large-scale droplet-based datasets without full-length sequencing costs.
+
+\section{Thesis Outline}
+The remainder of this thesis is organized as follows:
+
+\begin{itemize}
+    \item \textbf{Chapter 2: Background and Fundamentals.} Establishes theoretical foundations for transcript-level analysis in single-cell data. Covers pseudo-alignment algorithms, the Expectation-Maximization algorithm for resolving multi-mapping reads, mathematical properties of matrix sparsity, limitations of traditional statistical approaches, prior DTU detection work in bulk RNA-seq, and contingency table statistics underlying COTAN.
+    
+    \item \textbf{Chapter 3: Methods.} Details the reproducible methodology used throughout this thesis. Describes the custom computational pipeline for constructing transcript-level count matrices from raw sequencing data using alevin-fry, dataset selection criteria (human and mouse scRNA-seq datasets with known cell type annotations), and the step-by-step DTU detection algorithm adapted from COTAN's framework.
+    
+    \item \textbf{Chapter 4: Results and Discussion.} Evaluates empirical performance across multiple dimensions. Presents clustering quality assessments using the Global Differentiation Index, identifies candidate transcripts showing differential usage patterns between cell types in both human and mouse datasets, and discusses biological interpretations alongside methodological limitations.
+    
+    \item \textbf{Chapter 5: Conclusion.} Summarizes main contributions, evaluates whether adapting COTAN for transcript-level analysis successfully addresses DTU detection in sparse single-cell data, and outlines computational extensions for future work including scalability improvements and integration with spatial transcriptomics.
+\end{itemize}

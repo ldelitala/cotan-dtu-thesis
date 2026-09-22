@@ -1,0 +1,55 @@
+\chapter{Conclusions}
+
+This thesis established that COTAN's sparsity-robust contingency-table framework can be extended to transcript-level analysis, recovering within-gene exclusivity patterns indicative of Differential Transcript Usage (DTU) from sparse $3'$-biased single-cell RNA sequencing data. The key insight---that zero patterns carry reliable signal even in extremely sparse matrices---transfers successfully from gene co-expression to isoform mutual exclusivity detection.
+
+\section{Summary of Contributions}
+
+Three primary contributions emerge from this work:
+\begin{enumerate}
+    \item \textbf{Methodological extension}: COTAN's statistical framework, originally designed for gene-gene co-expression analysis, was adapted for transcript-level DTU detection. The algorithm identifies mutually exclusive isoform pairs through contingency-table independence tests and validates them via bidirectional contrast thresholds across cell clusters.
+
+    \item \textbf{Reproducible workflow}: A complete pipeline for generating transcript-count matrices from $3'$-biased scRNA-seq data was developed and documented. This includes modifications to alevin-fry pseudo-alignment (identity t2g mapping), custom Nextflow automation, and COTAN integration scripts---all made available via the GitHub repository.
+
+    \item \textbf{Empirical validation}: Application to two datasets (human cell line mixture: 29k cells; mouse brain tissue: 4k cells) demonstrated feasibility. Top candidates (Meg3, Malat1, TPM1) align with published biology \cite{ghanam2023malat1, xue2012specialized} despite the challenging $3'$-bias constraint, validating that genuine isoform switches can be recovered from droplet-based data.
+\end{enumerate}
+
+The comparison between transcript-level and gene-level clustering revealed a secondary but important finding: fine-grained cellular substructure captured by isoform analysis enables detection of subtle DTU events invisible to aggregated counts. This suggests that as scRNA-seq datasets grow larger and deeper, transcript-aware methods will become increasingly powerful for uncovering post-transcriptional regulation in single cells.
+
+\section{Broader Implications}
+
+This work has implications across three domains:
+
+\textbf{For computational genomics}: The success of contingency-table statistics at transcript resolution demonstrates that sparsity need not be treated as a problem to overcome (via imputation or log-transformation) but rather modeled directly. This philosophy may extend to other single-cell challenges---allele-specific expression, chromatin accessibility peak co-occurrence, and multi-modal integration.
+
+\textbf{For isoform biology}: Detecting DTU in $3'$-biased data opens new analysis opportunities for existing large-scale datasets (e.g., Human Cell Atlas, Tabula Sapiens\defn{Human Cell Atlas / Tabula Sapiens}{Large international reference atlases of single-cell transcriptomes across human tissues, previously unusable for isoform-level questions because they relied on 3'-biased droplet data.}) that were previously unusable for isoform-level questions. While sensitivity is limited compared to full-length protocols, the trade-off between cell numbers and coverage may favor droplet methods when statistical power from thousands of cells outweighs per-cell depth.
+
+\textbf{For COTAN framework development}: This thesis validates that COTAN's core design principles---modeling zeros as signal rather than noise, using large-$m$ $\chi^2$ approximations for $p$-value calibration---generalize beyond gene-level analysis. Future extensions to other single-cell modalities (ATAC-seq\defn{ATAC-seq}{Assay for Transposase-Accessible Chromatin: maps genome regions where chromatin is open, indicating regulatory activity.} peak co-occurrence, protein abundance correlations in CITE-seq\defn{CITE-seq}{A protocol that simultaneously measures RNA and surface proteins in the same single cells, enabling multi-modal analysis.}) appear feasible.
+
+\section{Limitations and Future Work}
+
+Despite encouraging results, several constraints must be acknowledged:
+\begin{itemize}
+    \item \textbf{$3'$-bias constraint}: Alternative splicing events in transcript mid-regions remain undetectable when only transcript $3'$ ends are sequenced. The DTU candidates we find represent those where isoforms differ at their $3'$ ends (terminal exon choice).
+
+    \item \textbf{Lack of orthogonal validation}: Without long-read sequencing or targeted RT-PCR confirmation, false positive rates remain estimated from internal consistency rather than ground truth. This is a critical next step for biological claims.
+
+    \item \textbf{Threshold sensitivity}: The contrast threshold $\tau$ was tuned empirically. Formal statistical calibration via permutation testing would improve reproducibility and enable cross-dataset comparisons.
+
+    \item \textbf{EM rounding artifacts}: Fractional EM assignments were rounded to integers for COTAN compatibility, potentially distorting low-abundance isoforms.
+\end{itemize}
+
+Future work should address these limitations through:
+\begin{enumerate}
+    \item Integration with long-read datasets (PacBio, Oxford Nanopore) for complete isoform annotation.
+    \item Permutation-based threshold calibration and false discovery rate control.
+    \item Extension to trajectory-aware analysis along differentiation paths.
+    \item Benchmarking against bulk DTU tools on matched pseudo-bulks \cite{love2018swimming, draper2025selecting}.
+\end{enumerate}
+
+\section*{Final Remarks}
+
+This thesis demonstrates that transcript-level COTAN can reveal regulatory programs hidden to gene-centric analyses. The contingency-table framework provides a principled approach to sparse data analysis---one that respects the actual measurement process rather than imposing transformations designed for dense, normally distributed data.
+
+The path forward is clear: with orthogonal validation and integration of complementary technologies (long-read sequencing, trajectory modeling), isoform-aware single-cell methods will transition from proof-of-concept to standard practice. As datasets continue scaling toward millions of cells, the statistical power from large sample sizes may compensate for per-cell sparsity, making DTU detection in droplet-based data increasingly viable.
+
+The framework established here provides a foundation for that future work---combining methodological rigor (contingency-table statistics), computational reproducibility (documented Nextflow pipeline), and biological validation (alignment with known isoform switches). Whether applied to neurogenesis, cancer evolution, or developmental biology, the core question remains: \textit{which transcripts are cells expressing, and how does that choice change across conditions?} COTAN's answer---modeling zeros as signal rather than noise---offers a robust path forward for sparse single-cell data analysis.

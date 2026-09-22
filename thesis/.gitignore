@@ -1,0 +1,13 @@
+# LaTeX build artifacts
+*.aux
+*.log
+*.out
+*.fdb_latexmk
+*.fls
+*.blg
+*.bbl
+build/
+main.pdf
+main.synctex.gz
+.overleaf/
+thesis_overleaf.zip

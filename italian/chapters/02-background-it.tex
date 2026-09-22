@@ -1,0 +1,182 @@
+\chapter{Teoria e framework}
+
+Questo capitolo fornisce le basi teoriche per comprendere i metodi del Capitolo 3. Copre i concetti di preprocessing dello \gls{scRnaSeq}, il framework COTAN per dati sparsi e i fondamenti di \gls{dtu}.
+
+\section{Pipeline di preprocessing}
+
+Questa sezione segue un singolo esperimento di \gls{scRnaSeq} dal suo meccanismo di generazione dei dati fino alla \gls{countMatrix} consumata da ogni analisi successiva, e tratta quel percorso come una pipeline in quattro fasi: acquisizione e controllo di qualità, mappatura, risoluzione probabilistica dei read ambigui e deduplicazione in una matrice. Ogni fase è vincolata da quella precedente, quindi l'hardware scelto nel primo passo determina in ultima analisi la forma, la \gls{sparsity} e il contenuto della matrice finale.
+
+\subsection{Due famiglie di protocolli: gocce e piastre}
+I protocolli di \gls{scRnaSeq} si dividono attualmente in due categorie con caratteristiche profondamente diverse:
+
+\textbf{\Gls{dropletProtocols}.} La piattaforma Chromium di 10x Genomics\defn{10x Genomics Chromium}{La piattaforma commerciale a goccia dominante, che barcoda ogni cellula in una goccia microfluidica.} incapsula ogni cellula insieme a una bead barcodata in una goccia di picolitri, raggiungendo decine o centinaia di migliaia di cellule ma sequenziando solo l'estremità terminale dei trascritti, il che rimuove l'informazione sulle giunzioni di splicing interne necessaria a separare le isoforme.
+
+\textbf{\Gls{plateProtocols}.} SMART-seq2\defn{SMART-seq2}{Un protocollo scRNA-seq full-length su piastra, una cellula per pozzetto, che cattura i trascritti interi.} isola ogni cellula nel proprio pozzetto e cattura i suoi trascritti da un capo all'altro, così la struttura interna è preservata, al prezzo di un costo elevato per cellula e di un \gls{throughput} limitato a centinaia o poche migliaia di cellule.
+
+Il divario di \gls{throughput} deriva da come le cellule vengono compartimentate. Nei protocolli su piastra ogni cellula occupa un pozzetto di una piastra da 96 o 384 pozzetti, dispensata singolarmente tramite cell sorting attivato da fluorescenza\defn{Cell sorting attivato da fluorescenza (FACS)}{Un metodo che smista le singole cellule nei pozzetti una alla volta usando etichette fluorescenti.} o diluizione limite, e ogni pozzetto è una reazione separata con i propri volumi di reagenti e la propria manipolazione. Il throughput scala quindi con il numero di pozzetti, limitando un esperimento a poche migliaia di cellule, mentre ogni pozzetto riceve la capacità di sequenziamento di una singola cellula: le librerie raggiungono circa un milione di read per cellula, distribuiti lungo l'intero trascritto. I dati su piastra sono lenti e costosi per cellula, ma è proprio quella copertura full-length a renderli informativi per le domande a livello di isoforma \cite{conte2024opportunities}.
+
+La microfluidica a gocce\defn{Microfluidica a gocce}{Una tecnica che forma migliaia di gocce di picolitri al secondo, ciascuna incapsulando una cellula insieme a una bead barcodata.} sostituisce il pozzetto con un contenitore di reazione autoassemblato: un dispositivo microfluidico combina le cellule con bead di gel in una fase oleosa, formando migliaia di gocce di picolitri al secondo, ciascuna destinata a contenere una cellula e una bead, con la bead che fornisce i primer e il barcode. Il throughput raggiunge decine di migliaia di cellule per corsa a una frazione del costo per cellula \cite{ding2020systematic}, al prezzo di tre vincoli. L'output dello strumento è condiviso tra l'intera popolazione, quindi la profondità per cellula scende a poche migliaia di molecole. La cattura è stocastica, quindi le gocce senza cellula vengono scartate mentre le gocce che contengono due cellule (multiplet) producono profili misti che il controllo di qualità deve rimuovere. Infine, il priming oligo-dT\defn{Priming oligo-dT}{Primer di cattura formati da una breve catena di basi di timina, che si appaiano alla coda poli-A e iniziano lì la sintesi. Il frammento catturato è quindi l'estremità 3' della molecola.} legge verso l'esterno a partire dalla coda poli-A\defn{Coda poli-A}{Una catena di basi di adenina aggiunta all'estremità 3' di un mRNA maturo; stabilizza la molecola e funge da sito di legame per i primer di cattura nei protocolli con priming terminale.}, quindi la copertura interna---il segnale che distingue isoforme strutturalmente simili---è assente.
+
+\subsection{Il compromesso tra throughput e profondità}
+
+Il compromesso è un vincolo hardware, non biologico: uno strumento emette un numero fisso di read, quindi ogni cellula aggiuntiva divide ulteriormente lo stesso output. La Tabella~\ref{tab:protocolli} mette a confronto le due chimiche.
+
+\begin{table}[h]
+\centering
+\small
+\caption{Le due principali chimiche di libreria a singola cellula. La profondità per cellula, il costo e i tempi di preparazione vanno nella direzione opposta rispetto al throughput.}\label{tab:protocolli}
+\begin{tabular}{lcc}
+\toprule
+ & \textbf{Goccia (10x)} & \textbf{Piastra (SMART-seq2)} \\
+\midrule
+Cellule per esperimento & $10^{4}$--$10^{5}$ & $10^{2}$--$10^{3}$ \\
+Molecole per cellula & $\sim 10^{3}$ & $\sim 10^{5}$ \\
+Copertura & solo il 3' terminale & trascritto intero \\
+Costo dei reagenti per cellula & riferimento & $\approx 100\times$ superiore \\
+Tempo di preparazione & una corsa al giorno & giorni per piastra \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Le due colonne vanno in direzioni opposte: la chimica a goccia compra throughput rinunciando a profondità e copertura, mentre la chimica su piastra compra profondità e copertura rinunciando alla scala, a un costo dei reagenti per cellula circa cento volte superiore \cite{conte2024opportunities}. Nella colonna delle gocce, poche migliaia di molecole per cellula distribuite su $T \approx 200{,}000$ isoforme lasciano la maggior parte delle voci a zero, e i read confinati al 3' terminale non possono separare isoforme che condividono quell'estremità. Questa tesi lavora dentro la colonna delle gocce, quindi la sua sparsità è la condizione di partenza e non un difetto dell'analisi.
+
+\subsection{Fase 1: acquisizione dei dati e controllo di qualità}
+Prima della quantificazione, i read grezzi di sequenziamento vengono sottoposti a controllo di qualità. Le sequenze adattatore vengono rimosse e le basi di bassa qualità filtrate con strumenti come cutadapt o fastp. Per i protocolli a goccia (ad esempio 10x Genomics) si applica un filtro sui cell barcode per escludere gocce vuote e multiplet.
+
+I protocolli a goccia portano inoltre due barcode su ogni read: un cell barcode che identifica la cellula di origine e un \gls{umi} la cui sequenza casuale viene legata a ciascun mRNA catturato prima dell'amplificazione PCR. La preparazione dei file FASTQ\defn{FASTQ}{Il formato di file che contiene i read grezzi di sequenziamento insieme a un punteggio di qualità per base per ogni nucleotide.} estrae e rimuove questi tag.
+
+
+\subsection{Fase 2: algoritmi di mappatura (allineamento e pseudo-allineamento)}
+Quantificare l'espressione dei trascritti richiede di assegnare ogni read breve al trascritto da cui proviene. Il carico computazionale complessivo è governato dal numero di read,
+
+$$R = N \cdot M,$$
+
+dove $N$ è il numero di cellule e $M$ è il numero medio di read per cellula. In un esperimento a goccia su larga scala, $N \approx 5 \times 10^4$ cellule e $M \approx 2 \times 10^6$ read per cellula, quindi $R \approx 10^{11}$ read.
+
+Le dimensioni restanti derivano dai riferimenti di mammifero e dalla chimica 10x Genomics analizzata in questa tesi (Capitolo~3). Il trascrittoma contiene $T \approx 200{,}000$ isoforme, l'ordine di grandezza di una normale annotazione GENCODE umana o murina (circa 250.000 trascritti nell'uomo e 150.000 nel topo). Poiché il pre-mRNA non spliced viene filtrato durante il preprocessing, l'indice di pseudo-allineamento contiene solo trascritti maturi e spliced, la cui lunghezza media è $L_{avg} \approx 1{,}500$\,bp. La lunghezza dei read è un vincolo hardware e non biologico: in un saggio $3'$, il Read~1 porta il cell barcode e l'UMI mentre il Read~2 cattura la sequenza del trascritto, sequenziato a $L \approx 90$--$150$\,bp a seconda della chimica del kit Illumina.
+
+Gli algoritmi di allineamento tradizionali\defn{Allineamento dei read}{Mappatura base per base di un read sul riferimento, che fornisce coordinate esatte a un costo computazionale elevato.} (ad esempio BWA, Bowtie2) mappano i read base per base contro il riferimento usando un indice a Trasformata di Burrows-Wheeler\defn{Trasformata di Burrows-Wheeler (BWT)}{Una trasformazione reversibile del testo che consente una ricerca rapida di sottostringhe in un indice compresso del riferimento.}. Costruire l'indice costa $O(T \cdot L_{avg})$, e ciascuno degli $R$ read viene poi localizzato con una ricerca il cui costo cresce logaritmicamente con la dimensione del riferimento. La fase di interrogazione costa quindi $O(R \cdot L \log T)$, per un tempo di esecuzione totale di
+
+$$O(T \cdot L_{avg}) + O(R \cdot L \log T).$$
+
+Ogni read viene di fatto cercato nell'intero trascrittoma, e l'allineatore deve inoltre tollerare errori di sequenziamento, inserzioni e delezioni. Questo produce coordinate esatte a livello di base, ma il costo della ricerca cresce con la dimensione del riferimento, il che diventa proibitivo su miliardi di read in un singolo esperimento a singola cellula.
+
+La trascrittomica moderna su dati a goccia si affida allo \textbf{pseudo-allineamento}, che poggia su un'osservazione più ristretta: la quantificazione non richiede le coordinate esatte di un read, ma solo l'identità del trascritto da cui proviene. Gli algoritmi di pseudo-allineamento (come Salmon/alevin-fry o kallisto) sostituiscono quindi la ricerca con accessi a tabelle. Ogni read viene suddiviso in $k$-mer\defn{k-mer}{Una sottostringa contigua di lunghezza $k$; i read vengono confrontati con i trascritti attraverso i $k$-mer che condividono.} sovrapposti---brevi sottostringhe di lunghezza $k$---e ogni $k$-mer viene cercato in una tabella che registra quali trascritti lo contengono. L'intersezione di questi insiemi lascia i trascritti compatibili con il read, ovvero una classe di equivalenza\defn{Classe di equivalenza}{L'insieme dei trascritti che avrebbero potuto produrre un read, poiché tutti contengono i suoi $k$-mer.} di trascritti candidati\cite{he2022alevin}. L'algoritmo procede in due fasi:
+
+\begin{itemize}
+    \item \textbf{Costruzione dell'indice:} una tabella di ricerca dei $k$-mer (o un grafo di de Bruijn colorato\defn{Grafo di de Bruijn colorato}{Un grafo di $k$-mer sovrapposti in cui ogni $k$-mer è colorato con i trascritti che lo contengono, usato come indice di pseudo-allineamento.}, in cui ogni $k$-mer è colorato dai trascritti che lo contengono) viene costruita una sola volta a partire dai trascritti di riferimento, a un costo di
+    $$O(T \cdot L_{avg}) \;\text{(tempo)}, \qquad O(k \cdot |\Sigma|^k) \;\text{(spazio)},$$
+    dove $|\Sigma|=4$ per il DNA. Questo costo è identico per allineamento e pseudo-allineamento, ed è pagato una volta prima di elaborare qualsiasi read.
+    
+    \item \textbf{Fase di interrogazione:} per ogni read vengono estratti tutti i $L-k+1$ $k$-mer sovrapposti e i loro insiemi di trascritti vengono intersecati. Ogni passo è un accesso a una tabella hash, quindi il costo per read è indipendente dalla dimensione del trascrittoma:
+    $$O(L).$$ Con $k=31$ e $L \approx 90$--$150$\,bp, vengono eseguiti all'incirca 60--120 accessi per read.
+\end{itemize}
+
+I due metodi condividono quindi l'identico termine di costruzione dell'indice $O(T \cdot L_{avg})$ e differiscono solo nel termine di interrogazione. Lo pseudo-allineamento sostituisce la ricerca logaritmica $O(R \cdot L \log T)$ con un accesso a tempo costante $O(R \cdot L)$, per un tempo di esecuzione totale di
+
+$$O(T \cdot L_{avg}) + O(R \cdot L).$$
+
+È il disaccoppiamento del costo per read dalla dimensione del riferimento a produrre l'accelerazione. Il divario asintotico tra i due termini di interrogazione è un fattore $\log_2 T \approx 17.6$ per $T = 200{,}000$, e il fattore costante più basso di un accesso hash allarga l'accelerazione osservata all'intervallo 50--100× tipicamente riportato. Per l'esperimento a goccia sopra descritto ($N = 5 \times 10^4$, $M = 2 \times 10^6$, $R \approx 10^{11}$), lo pseudo-allineamento riduce il tempo di elaborazione da giorni a ore su hardware standard.
+
+
+\subsection{Fase 3: risoluzione probabilistica tramite Expectation-Maximization}
+Lo pseudo-allineamento introduce una difficoltà computazionale: i \textbf{read multi-mappati}\defn{Read multi-mappato}{Un read compatibile con più di un trascritto perché quei trascritti ne condividono la sequenza.}---read i cui $k$-mer corrispondono a più di un trascritto perché quei trascritti condividono sequenza esonica. Un read che cade interamente dentro un esone condiviso non porta alcuna informazione su quale isoforma lo abbia prodotto, quindi lo pseudo-allineamento restituisce un insieme di candidati anziché un singolo trascritto. Questa ambiguità è più grave nei protocolli $3'$-biased, dove i read brevi catturano solo la regione terminale e spesso corrispondono a ogni isoforma che condivide quell'esone \cite{galfre2021cotan}.
+
+Scartare i read ambigui non è una soluzione praticabile: nei dati $3'$-biased essi costituiscono la maggioranza, quindi eliminarli ridurrebbe la matrice di conteggi e distorcerebbe le proporzioni delle isoforme verso quelle che per caso portano sequenza unica. Gli pseudo-allineatori moderni risolvono l'ambiguità con l'algoritmo Expectation-Maximization (EM)\defn{Expectation-Maximization (EM)}{Un algoritmo iterativo che stima le abbondanze dei trascritti e risolve congiuntamente l'assegnazione dei read ambigui finché non convergono.}, che stima le abbondanze delle isoforme e l'assegnazione dei read in modo congiunto alternando due passi:
+
+\begin{itemize}
+    \item \textbf{Passo E}\defn{Passo E / Passo M}{Le due fasi alternate dell'EM: distribuire i read secondo la stima corrente di abbondanza (E), poi ristimare le abbondanze (M).}: data la stima corrente di abbondanza, ogni read multi-mappato viene distribuito tra i trascritti candidati in proporzione a tali abbondanze. Un read compatibile con due isoforme presenti in 10 e 1 copie viene assegnato per circa $10/11$ e $1/11$ di conteggio.
+    \item \textbf{Passo M:} le abbondanze dei trascritti vengono ristimate a partire da queste assegnazioni frazionarie.
+\end{itemize}
+
+I due passi si alternano finché le stime non convergono. Questa ripartizione probabilistica preserva i segnali relativi delle isoforme invece di scartarli\cite{he2022alevin}, il che conta per la DTU: il segnale che distingue isoforme simili è esattamente il segnale che un read ambiguo porta con sé. L'EM produce quindi conteggi frazionari, che vengono sommati nella matrice di conteggi e arrotondati dove sono richiesti conteggi interi.
+
+\subsection{Fase 4: deduplicazione e generazione della matrice}
+Una volta che lo pseudo-allineamento ha assegnato ogni read a un trascritto, i read che condividono un cell barcode e un UMI sulla stessa feature vengono collassati in un unico conteggio. Il collasso si applica per feature: un UMI identifica una molecola solo all'interno di una cellula e di un gene, poiché molecole indipendenti possono condividere per caso la stessa sequenza di UMI. L'assegnazione della feature deve quindi precedere la deduplicazione, perché collassare sulla sola coppia grezza (cellula, UMI) unirebbe molecole distinte. Questo definisce l'unità di quantificazione come la molecola catturata anziché il read di sequenziamento, così che le copie amplificate per PCR di una stessa molecola non vengano scambiate per osservazioni indipendenti e cellule sequenziate a profondità diverse restino confrontabili.
+
+La pipeline di preprocessing produce una \gls{countMatrix} dell'espressione $X \in \mathbb{N}^{G \times N}$, in cui le righe indicizzano le feature genomiche (geni o trascritti), le colonne rappresentano singole cellule distinte e la voce $x_{fc}$ registra il conteggio osservato per la feature $f$ nella cellula $c$. In questa tesi $N$ indica il numero di cellule e $G$ il numero di feature. La risoluzione a livello di trascritto preserva i segnali specifici delle isoforme che l'aggregazione a livello genico oscurerebbe.
+
+
+Per l'analisi DTU a valle con COTAN, la matrice deve essere a livello di trascritto e non di gene. Inoltre gli algoritmi EM producono conteggi frazionari non interi, che possono richiedere un arrotondamento prima della discretizzazione binaria nell'analisi delle \glspl{contingencyTable}.
+
+\section{Il framework COTAN}
+
+La sezione precedente ha prodotto una matrice a livello di trascritto $X \in \mathbb{N}^{G \times N}$ attraverso le quattro fasi della pipeline. Quella matrice è l'input naturale per il framework statistico qui presentato, ed è anche la fonte della difficoltà: la scarsa profondità per cellula imposta dall'hardware a goccia lascia la maggior parte delle sue voci a zero. Il framework è stato introdotto da Galfr\`e et al.\ \cite{galfre2021cotan} ed è stato poi esteso per recuperare i cluster cellulari direttamente dalla struttura di co-espressione \cite{galfre2026gene}. Le sottosezioni seguenti caratterizzano quella sparsità e presentano la macchina delle tabelle di contingenza che COTAN usa per analizzarla direttamente.
+
+\subsection{Il problema della sparsità}
+Le matrici di conteggi a singola cellula mostrano una sparsità estrema: il 70--90\% delle voci sono zeri\cite{galfre2021cotan}. Questi rappresentano due fenomeni distinti:
+\begin{itemize}
+    \item \textbf{Zeri biologici}\defn{Zero biologico}{Un conteggio nullo che riflette l'assenza reale di un trascritto in una cellula, in contrapposizione a un dropout tecnico.}: assenze reali, in cui un gene o trascritto non viene trascritto in uno specifico stato cellulare.
+    \item \textbf{Zeri tecnici (dropout):} assenze false dovute a cattura, retrotrascrizione o sequenziamento falliti per la bassa efficienza chimica (~10--20\%); nei conteggi grezzi sono indistinguibili dagli zeri biologici.
+\end{itemize}
+
+Zeri biologici e zeri tecnici sono numericamente indistinguibili nelle matrici di conteggi grezze.
+
+
+Questo pone una difficoltà statistica fondamentale ai metodi pensati per \gls{bulkRnaSeq} densi:
+
+\begin{enumerate}
+    \item \textbf{Artefatti della log-normalizzazione}\defn{Log-normalizzazione (pseudo-conteggio)}{Aggiungere una piccola costante e poi applicare il logaritmo per stabilizzare la varianza, il che distorce i conteggi bassi e sparsi.}: aggiungere pseudo-conteggi e poi applicare il logaritmo distorce le misure di bassa abbondanza, comprimendo gli zeri in pattern di scala artificiali \cite{galfre2021cotan}.
+    
+    \item \textbf{Distorsione della correlazione:} le correlazioni di Pearson o Spearman\defn{Correlazione di Pearson / Spearman}{Misure standard di associazione lineare e basata sui ranghi che, su matrici sparse, seguono gli zeri condivisi invece della reale co-espressione.} misurano la coincidenza dei dropout anziché la reale co-espressione regolatoria nelle matrici sparse\cite{galfre2021cotan}.
+    
+    \item \textbf{Rischi dell'imputazione:} lo smoothing euristico sostituisce gli zeri con valori stimati dalle cellule vicine, introducendo spesso correlazioni artificiali e segnali spuri a valle \cite{galfre2021cotan}.
+\end{enumerate}
+
+Sebbene siano stati sviluppati alcuni metodi specifici per la singola cellula, molti si affidano ancora all'imputazione o a trasformazioni che possono oscurare il segnale biologico reale.
+
+
+COTAN adotta un approccio diverso: tratta gli zeri in modo esplicito tramite discretizzazione binaria, senza richiedere imputazione né trasformazioni stabilizzanti la varianza.
+
+\subsection{La soluzione a tabelle di contingenza}
+COTAN aggira le ampiezze continue dei conteggi e valuta le dipendenze a coppie usando test di indipendenza asintotici\defn{Test di indipendenza asintotico}{L'uso della distribuzione $\chi^2$ per grandi campioni per verificare se due feature sono statisticamente indipendenti.} su stati binari di presenza e assenza\cite{galfre2021cotan}. Per una coppia di feature $(f, f')$ su $N$ cellule, ogni cellula $c$ viene ridotta alla coppia di indicatori
+
+$$a_c = \mathbf{1}[x_{fc} > 0], \qquad b_c = \mathbf{1}[x_{f'c} > 0],$$
+
+e gli stati sono indicizzati da $i, j \in \{0,1\}$ in tutta questa sezione. Sia $O_{ij}$ il numero osservato di cellule con $a_c = i$ e $b_c = j$, cioè le voci della \gls{contingencyTable} $2 \times 2$. I totali marginali sono $\mathrm{Row}_i = \sum_j O_{ij}$ e $\mathrm{Col}_j = \sum_i O_{ij}$, con $\sum_i \mathrm{Row}_i = \sum_j \mathrm{Col}_j = N$. Sotto l'ipotesi nulla di indipendenza, il conteggio atteso nella cella $(i,j)$ della tabella è
+
+$$E_{ij} = \frac{\mathrm{Row}_i \cdot \mathrm{Col}_j}{N}.$$
+
+La deviazione dall'indipendenza viene valutata con la statistica chi-quadro di Pearson\defn{Statistica chi-quadro di Pearson ($\chi^2$)}{Una statistica di test che confronta i conteggi osservati con quelli attesi sotto l'ipotesi di indipendenza in una tabella di contingenza.}\cite{galfre2021cotan}:
+
+$$\chi^2 = \sum_{i \in \{0,1\}} \sum_{j \in \{0,1\}} \frac{(O_{ij} - E_{ij})^2}{E_{ij}}.$$
+
+Con migliaia di cellule ($N \gg 30$), l'approssimazione asintotica resta robusta\cite{galfre2021cotan}, consentendo di testare in modo efficiente milioni di coppie di feature.
+
+\subsection{Metriche di output}
+COTAN genera tre metriche principali \cite{galfre2021cotan}:
+\begin{enumerate}
+    \item \textbf{Matrice di co-espressione (coex)\defn{Matrice di co-espressione (coex)}{Le associazioni normalizzate a coppie di COTAN, calcolate a partire dalle statistiche di contingenza. Valori negativi indicano esclusività reciproca (due feature che co-occorrono raramente).}:} associazioni normalizzate a coppie a partire dalle statistiche di contingenza. I valori negativi indicano esclusività reciproca.
+    
+    \item \textbf{Analisi dell'espressione differenziale (DEA)\defn{Coefficiente di arricchimento DEA ($D_{f,S}$)}{Un punteggio in $(-1,1)$ che misura quanto fortemente la feature $f$ è arricchita (positivo) o impoverita (negativo) nel sottoinsieme di cellule $S$.}:} coefficienti di arricchimento $D_{f,S} \in (-1, 1)$ che misurano la forza dell'associazione feature--cluster.
+    
+    \item \textbf{\gls{gdi}:} misura di specificità di cluster per l'identificazione di marcatori e la validazione della qualità del clustering.
+\end{enumerate}
+
+Una co-espressione negativa tra isoforme dello stesso gene funge da indicatore principale di uso alternativo dei trascritti.
+
+
+\section{Fondamenti della DTU}
+
+\subsection{DTU ed espressione genica differenziale}
+La \gls{dtu} si verifica quando l'espressione relativa di più trascritti dello stesso gene cambia tra condizioni diverse. Questo differisce in modo sostanziale dalla \gls{deg}, che misura cambiamenti di abbondanza totale.
+
+Biologicamente, la DTU riflette decisioni di \gls{splicing}---un meccanismo regolatorio chiave con cui le cellule producono isoforme proteiche funzionalmente distinte dallo stesso gene. Rilevare questi spostamenti richiede risoluzione a livello di trascritto; aggregare ai geni cancella il segnale.
+
+\subsection{Perché i metodi bulk falliscono sullo scRNA-seq}
+I metodi DTU bulk consolidati\defn{rMATS / SUPPA2 / DRIMSeq}{Strumenti DTU bulk che modellano proporzioni continue di isoforme a partire da copertura interna profonda dei read.} (rMATS, SUPPA2, DRIMSeq) modellano proporzioni continue di isoforme e richiedono copertura interna profonda; falliscono sui dati a singola cellula per tre ragioni \cite{galfre2021cotan, love2018swimming}:
+\begin{enumerate}
+    \item \textbf{Bassa profondità per cellula:} produce stime degeneri delle proporzioni, con un eccesso di zeri.
+    \item \textbf{Bias 3':} il sequenziamento terminale rende gli eventi di splicing interni invisibili ai metodi che cercano read che attraversano le giunzioni.
+    \item \textbf{Aggregazione in pseudo-bulk:} unire le cellule recupera profondità di lettura ma oscura l'eterogeneità cellula per cellula che guida il rilevamento della DTU.
+\end{enumerate}
+
+I metodi DTU basati sulle proporzioni sono stati estesi alla singola cellula: \textit{satuRn} \cite{gilis2021satuRn} adatta un GLM quasi-binomiale alle proporzioni delle isoforme, mentre \textit{Sierra} \cite{patrick2020sierra} e \textit{DTUrtle} \cite{tekath2021dturtle} modellano anch'essi proporzioni di isoforme, alcuni dei quali si basano sull'aggregazione in pseudo-bulk e ne ereditano quindi il compromesso. Draper et al.\ \cite{draper2025selecting} passano in rassegna i criteri pratici per scegliere metodi di splicing differenziale su dati short-read. Nessuno di questi approcci sfrutta direttamente il pattern degli zeri, che è la lacuna che questa tesi affronta.
+
+Questo motiva l'adattamento del framework di COTAN per dati sparsi all'analisi a livello di trascritto.
+
+
+\subsection{Il segnale di esclusività reciproca}
+Nel framework COTAN, le associazioni statistiche negative (\gls{mutualExclusivity}) tra feature possono indicare pattern di uso alternativo. Per isoforme dello stesso gene, tale esclusività reciproca sarebbe coerente con eventi di splicing alternativo o di \gls{isoformSwitch} in cui stati cellulari diversi esprimono preferenzialmente varianti distinte del trascritto.
+
+Questa tesi adatta tale principio al rilevamento della DTU, cercando coppie di isoforme mutuamente esclusive e quantificandone le preferenze specifiche per cluster---un contributo metodologico dettagliato nel Capitolo 3.

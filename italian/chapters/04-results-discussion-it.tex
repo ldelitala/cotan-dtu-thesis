@@ -1,0 +1,218 @@
+\chapter{Risultati e discussione}
+
+Questo capitolo presenta i risultati dell'applicazione di COTAN a livello di trascritto su dati scRNA-seq. Si parte dalla valutazione della qualità (validazione del clustering tramite GDI), si confrontano poi la struttura a livello genico e quella a livello di trascritto, e si presenta infine il contributo principale: i risultati del rilevamento DTU sui dataset umano e murino. Ogni sezione concorre a rispondere alla domanda se dati sparsi $3'$-biased possano sostenere la scoperta di switch di isoforma tramite statistiche su tabelle di contingenza.
+
+\section{Valutazione della qualità dei dataset tramite GDI}
+
+Prima di interpretare le chiamate DTU occorre stabilire che il clustering catturi una struttura biologicamente significativa e non rumore tecnico. Il Global Differentiation Index (GDI) fornisce questa validazione misurando l'omogeneità dei cluster e la specificità dei geni marcatore.
+
+\subsection*{Qualità del clustering a livello di trascritto}\label{sec:gdi-transcript}
+
+La Figura~\ref{fig:gditranscript} mostra il grafico GDI per il dataset murino raggruppato sui conteggi per trascritto. Ogni punto rappresenta una cellula, colorata secondo il cluster assegnato (11 cluster uniformi in totale). La netta separazione spaziale indica che i pattern di co-espressione a livello di trascritto distinguono popolazioni cellulari distinte.
+
+Osservazioni principali da questa visualizzazione:
+\begin{itemize}
+    \item I confini tra cluster sono ben definiti, con sovrapposizione minima, il che suggerisce firme isoforma-specifiche robuste.
+    \item I geni ad alto GDI (candidati marcatore) mostrano un arricchimento selettivo in cluster specifici anziché un'espressione uniforme.
+    \item Le cellule del residuo rumoroso (non assegnate ad alcun cluster) formano una nube centrale compatta; sono state escluse dall'analisi DTU a valle.
+\end{itemize}
+
+
+Questo conferma che i dati a livello di trascritto contengono segnale sufficiente per un clustering significativo, nonostante la sparsità e i vincoli del bias 3'.
+
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=0.8\textwidth]{GDI_transcript_plot_markers.png}
+    \caption{Grafico GDI del dataset murino raggruppato sui conteggi a livello di trascritto (11 cluster). La netta separazione spaziale indica firme isoforma-specifiche robuste nonostante i dati sparsi.}
+    \label{fig:gditranscript}
+\end{figure}
+
+\subsection*{Confronto tra struttura genica e struttura dei trascritti}
+
+La Figura~\ref{fig:gdi_genes} mostra le stesse cellule raggruppate usando i conteggi genici standard (15 cluster). La diversa risoluzione dei cluster---gruppi più numerosi ma più piccoli rispetto al clustering sui trascritti---suggerisce che l'aggregazione ai geni perde struttura a grana fine. Questa differenza conta per la DTU: se i segnali specifici delle isoforme guidano l'identità cellulare, la media a livello genico li oscurerebbe.
+
+Il confronto rivela anche quali cellule sono più influenzate dalla scelta di clustering. Le cellule vicine ai confini tra cluster in un metodo ma interne ai cluster nell'altro rappresentano casi ambigui in cui la classificazione dipende dalla risoluzione. Questi casi limite possono spiegare perché alcuni eventi DTU compaiono solo con specifiche strategie di clustering (discusso più avanti).
+
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=0.8\textwidth]{GDI_genes_plot_markers.png}
+    \caption{Grafico GDI del dataset murino raggruppato sui conteggi a livello genico (15 cluster). La diversa risoluzione rispetto al clustering sui trascritti suggerisce che l'aggregazione perde struttura a grana fine.}
+    \label{fig:gdi_genes}
+\end{figure}
+
+Queste analisi GDI stabiliscono che entrambi gli approcci di clustering catturano segnale biologico reale, ma con sensibilità diversa alla sottostruttura cellulare. Si passa ora alla domanda principale: questa differenza strutturale si traduce in un rilevamento DTU diverso?
+
+\section{Confronto tra clustering a livello genico e a livello di trascritto}\label{sec:clustering-comparison}
+
+Per quantificare quanto i due clustering divergano, è stata costruita una matrice di confusione sulle 4.077 cellule comuni presenti in entrambe le analisi.
+
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=0.8\textwidth]{heatmap_genes_vs_transcripts.pdf}
+    \caption{Matrice di confusione che confronta le assegnazioni a livello di trascritto (11 cluster) e a livello genico (15 cluster) per le 4.077 cellule comuni del dataset murino. La dominanza della diagonale indica una sovrapposizione sostanziale; le voci fuori diagonale rivelano pattern sistematici di suddivisione e fusione.}
+    \label{fig:confusion-matrix}
+\end{figure}
+
+La Figura~\ref{fig:confusion-matrix} mostra la heatmap della matrice di confusione. Emergono diversi pattern:
+\begin{itemize}
+    \item \textbf{Dominanza della diagonale}: la maggior parte delle cellule riceve assegnazioni coerenti nei due metodi, il che conferma che nessuno dei due produce cluster casuali.
+    
+    \item \textbf{Suddivisione sistematica}: diversi cluster a livello di trascritto corrispondono a sotto-regioni di un singolo cluster genico. Per esempio, il cluster 4 dei trascritti si separa dal più ampio cluster genico 7, suggerendo una variazione isoformica all'interno di ciò che appare omogeneo alla risoluzione genica.
+    
+    \item \textbf{Fusione selettiva}: viceversa, alcuni cluster adiacenti a livello di trascritto si fondono nell'analisi genica, indicando che le loro differenze dipendono da pattern di espressione specifici delle isoforme anziché dall'attività trascrizionale complessiva.
+\end{itemize}
+
+L'interpretazione è che il clustering a livello di trascritto rivela una sottostruttura cellulare invisibile all'aggregazione genica. È esattamente il regime in cui il rilevamento DTU dovrebbe aggiungere valore: se gli switch di isoforma distinguono stati cellulari che i soli geni non separano, i metodi isoform-aware catturano segnali biologicamente rilevanti.
+
+Questo solleva però una domanda critica: gli eventi DTU rilevati sono robusti tra strategie di clustering, o dipendono interamente da come le cellule vengono partizionate? La questione è affrontata più avanti.
+
+\section{Risultato principale: rilevamento della DTU}\label{sec:dtu-results}
+\textit{(Questa sezione presenta il contributo principale di questa tesi---l'applicazione di COTAN al rilevamento DTU a livello di trascritto.)}
+
+L'algoritmo della Sezione~\ref{sec:methods-dtu-algorithm} è stato applicato sia al dataset umano sia a quello murino, filtrando per coppie di isoforme mutuamente esclusive con preferenza bidirezionale tra cluster (soglia $\tau$ come specificato). I risultati dimostrano che le statistiche su tabelle di contingenza possono recuperare pattern di esclusività all'interno di un gene anche in dati sparsi $3'$-biased.
+
+\subsection*{Risultati sul dataset umano (Arigoni)}\label{sec:results-human}
+
+La miscela di linee cellulari umane ha fornito una validazione contro biologia nota. Dopo la soglia a $\tau = 0.2$ sono stati identificati:
+\begin{itemize}
+    \item \textbf{430 geni con coppie di isoforme significativamente mutuamente esclusive} ($p < 0.05$)
+    \item \textbf{21 candidati DTU su 9 geni} che superano la soglia di contrasto bidirezionale
+\end{itemize}
+
+Il valore di $\tau$ più alto riflette cluster di linee cellulari ben definiti e ben separati, che consentono un filtraggio più severo per ottenere chiamate sicure.
+
+Risultati rappresentativi:
+\begin{enumerate}
+    \item \textbf{TPM1 (tropomiosina 1)}: più isoforme mostrano preferenze opposte tra le linee cellulari. L'isoforma A è arricchita in PC9 e DV90; l'isoforma B domina in A549 e HCC78.
+    
+    \item \textbf{RPL10, RPS24 (proteine ribosomiali)}: segnali DTU inattesi nei geni ribosomiali suggeriscono una regolazione della traduzione specifica per tipo cellulare---coerente con l'eterogeneità della composizione ribosomiale alla base di una traduzione specializzata \cite{xue2012specialized}.
+\end{enumerate}
+
+L'elenco finale di candidati relativamente ridotto (9 geni) riflette il disegno conservativo dell'algoritmo: richiedere sia l'\gls{mutualExclusivity} sia il contrasto bidirezionale elimina le associazioni spurie.
+
+\subsection*{Risultati sul dataset murino (Ding)}\label{sec:results-mouse}
+
+Per il tessuto cerebrale murino è stata applicata una soglia più bassa ($\tau = 0.05$) per catturare transizioni più sottili lungo le traiettorie di differenziazione:
+\begin{itemize}
+    \item \textbf{14 geni con coppie significative}
+    \item \textbf{46 candidati DTU su 8 geni} dopo il filtraggio sul contrasto
+\end{itemize}
+
+Il numero maggiore di candidati nonostante meno coppie significative iniziali suggerisce che il tessuto cerebrale murino mostri pattern di \gls{isoformSwitch} più graduali, anziché switch netti come quelli tra linee cellulari.
+
+Risultati rappresentativi:
+\begin{enumerate}
+    \item \textbf{Meg3 (maternally expressed gene 3)}: RNA lungo non codificante\defn{RNA lungo non codificante (lncRNA)}{Una lunga molecola di RNA che non codifica una proteina ma regola l'espressione genica, lo splicing e lo sviluppo.} con un ruolo documentato nella differenziazione neuronale. L'isoforma A domina nei primi cluster progenitori; l'isoforma B è arricchita nei cluster di neuroni differenziati, uno switch che segue la traiettoria di differenziazione anziché uno stato binario netto.
+    
+    \item \textbf{Malat1 (metastasis-associated lung adenocarcinoma transcript 1)}: un altro lncRNA altamente conservato coinvolto nella regolazione dello splicing. Mostra preferenze di isoforma specifiche per cluster, coerenti con l'uso alternativo dell'isoforma 3$'$ documentato per questo locus \cite{ghanam2023malat1}.
+
+    \item \textbf{Srrm2 (serine/arginine-rich splicing factor 2)}: codifica una componente centrale dello spliceosoma\defn{Spliceosoma}{La macchina molecolare che rimuove gli introni e unisce gli esoni durante lo splicing.}. La sua stessa DTU suggerisce una regolazione a feedback---lo splicing alternativo dei fattori di splicing è un meccanismo noto per modulare il panorama delle isoforme tra stati cellulari.
+
+    \item \textbf{Ttc14 (tetratricopeptide repeat domain 14)}: candidato nuovo, senza letteratura DTU precedente. Richiede una \gls{orthogonalValidation} per confermarne il significato biologico.
+\end{enumerate}
+
+Questi hit su lncRNA (Meg3, Malat1) sono particolarmente incoraggianti perché si confermano rispetto a biologia nota nonostante il vincolo del bias 3'---dimostrando che COTAN a livello di trascritto può recuperare segnali reali anche in condizioni difficili.
+
+
+\subsection*{Analisi di robustezza: eventi condivisi ed esclusivi}\label{sec:robustness}
+
+Il rilevamento DTU è stato rieseguito usando le etichette di cluster derivate dai geni sulla stessa matrice di trascritti, poi gli elenchi di eventi sono stati confrontati tra le due strategie di clustering:
+
+\begin{table}[htbp]
+\centering
+\begin{tabular}{lcc}
+    \toprule
+    & \textbf{Clustering sui trascritti} & \textbf{Clustering sui geni} \\
+    \midrule
+    Coppie DTU totali rilevate & 46 & 46 \\
+    \bottomrule
+\end{tabular}
+\caption{Sovrapposizione degli eventi DTU tra le strategie di clustering (dataset murino). Totali uguali ma composizione diversa rivelano i pattern di robustezza.}
+\label{tab:dtu-robustness}
+\end{table}
+
+Ripartizione della composizione degli eventi:
+\begin{itemize}
+    \item \textbf{Eventi condivisi}: la maggioranza delle coppie è rilevata da entrambi i metodi, tra cui Meg3 e Malat1---si tratta di segnali forti che sopravvivono indipendentemente dallo schema di partizione.
+    
+    \item \textbf{Esclusivi dei trascritti (3 coppie)}: gli switch di isoforma di Srrm2 e Ttc14 compaiono solo con i cluster derivati dai trascritti. Riflettono probabilmente transizioni sottili che richiedono una risoluzione fine della popolazione per essere rilevate.
+
+    \item \textbf{Esclusivi dei geni (4 coppie)}: Snrnp70, Lrrc7, Zfp941 e una specifica coppia di Meg3 sono rilevati solo con il clustering a livello genico. Possono rappresentare segnali più deboli che beneficiano della potenza statistica aggregata.
+\end{itemize}
+
+L'interpretazione:
+\begin{enumerate}
+    \item I segnali DTU più forti (grande dimensione dell'effetto) sopravvivono a entrambi gli approcci, il che convalida la funzionalità di base dell'algoritmo.
+    
+    \item Gli switch sottili dipendono dalla risoluzione del clustering: il livello di trascritto cattura stati specifici delle isoforme, il livello genico fornisce potenza per i trascritti a bassa abbondanza.
+    
+    \item Nessun approccio domina in modo universale. La scelta dovrebbe dipendere dalla domanda biologica: sottostruttura a grana fine o robustezza statistica.
+\end{enumerate}
+
+Questa analisi di robustezza conferma che, mentre i segnali più forti sono indipendenti dal clustering, gli switch di isoforma sottili si rivelano solo con schemi di partizione adeguati. La scelta della strategia di clustering non è soltanto tecnica: determina quale biologia diventa visibile.
+
+\section*{Nota sulla sensibilità ai parametri}
+
+Il parametro di soglia $\tau$ è stato tarato empiricamente per produrre un numero di candidati biologicamente ragionevole (20--100 eventi validabili). Uno script di taratura dedicato è incluso nel repository GitHub, e lavori futuri potranno affinare questa scelta con un controllo del tasso di falsi positivi basato su permutazioni\defn{Test di permutazione}{Una procedura che rimescola le etichette per costruire una distribuzione nulla empirica, sostituendo una soglia arbitraria.} o con validazione incrociata su dataset ortogonali.
+
+\section{Discussione}\label{sec:discussion}
+
+I risultati vengono ora collocati nel più ampio contesto metodologico e biologico.
+
+\subsection*{Interpretazione dei risultati principali}
+
+Dai risultati emergono tre conclusioni centrali:
+\begin{enumerate}
+    \item \textbf{Fattibilità confermata}: il framework a tabelle di contingenza di COTAN rileva con successo la DTU in dati sparsi $3'$-biased. Questo ne estende l'applicabilità oltre la co-espressione a livello genico, fino all'analisi a risoluzione di isoforma.
+
+    \item \textbf{Plausibilità biologica convalidata}: i candidati principali (Meg3, Malat1, TPM1) sono coerenti con biologia nota---switch di lncRNA nella neurogenesi e regolazione delle proteine ribosomiali. Questo suggerisce che l'algoritmo recuperi segnale reale anziché artefatti tecnici.
+
+    \item \textbf{Il clustering conta}: la divergenza tra le chiamate DTU a livello di trascritto e a livello genico mostra che gli switch di isoforma possono distinguere sottostati cellulari invisibili ai conteggi aggregati. Un clustering a grana fine rende possibile il rilevamento di transizioni sottili.
+\end{enumerate}
+
+La convergenza tra dataset (linee cellulari umane e cervello murino) rafforza la fiducia nel metodo: funziona in contesti biologici diversi, non solo in un singolo caso favorevole.
+
+\subsection*{Limiti e avvertenze}
+
+Nonostante i risultati incoraggianti, alcuni vincoli ne temperano l'interpretazione:
+\begin{itemize}
+    \item \textbf{Invisibilità dovuta al bias $3'$}: gli eventi di splicing alternativo che avvengono nelle regioni centrali del trascritto restano non rilevabili quando si sequenziano solo le \gls{threePrimeEnd}. I candidati DTU trovati rappresentano un sottoinsieme---quelli in cui le isoforme differiscono negli esoni terminali o alle estremità 3'.
+
+    \item \textbf{Effetti dell'arrotondamento EM}: le assegnazioni frazionarie dell'EM sono state arrotondate a interi per compatibilità con COTAN. Le isoforme a bassa abbondanza, con conteggi frazionari piccoli, possono risultare distorte da questa discretizzazione, con la possibile introduzione di falsi negativi o l'alterazione dei valori di contrasto.
+
+    \item \textbf{Sensibilità alla soglia}: la scelta di $\tau$ manca di un fondamento statistico formale. La taratura empirica ha prodotto numeri di candidati ragionevoli, ma una distribuzione nulla basata su permutazioni fornirebbe $p$-value calibrati al posto di soglie arbitrarie.
+
+    \item \textbf{Assenza di validazione ortogonale}: senza sequenziamento long-read o conferma mirata tramite RT-PCR\defn{RT-PCR}{Reverse-transcription polymerase chain reaction: una tecnica di laboratorio che conferma sperimentalmente la presenza di una specifica isoforma, usata come verifica ortogonale delle chiamate DTU computazionali.}, i tassi di falsi positivi restano stimati a partire dalla coerenza interna (eventi condivisi ed esclusivi) anziché da una verità di riferimento.
+
+Questa è una limitazione comune agli studi DTU computazionali, ma resta critica per le affermazioni biologiche.
+\end{itemize}
+
+Questi limiti indicano direzioni concrete di miglioramento: read più lunghi per una copertura completa delle isoforme, una migliore gestione dell'EM tramite metodi a conteggi frazionari, una calibrazione formale delle soglie e una validazione sperimentale dei candidati principali.
+
+\subsection*{Direzioni future: estendere COTAN all'analisi dei trascritti}
+
+Il framework qui stabilito apre diverse vie di estensione metodologica:
+\begin{enumerate}
+    \item \textbf{Integrazione con dati long-read}: combinare la profondità short-read (migliaia di cellule) con l'annotazione delle isoforme da PacBio/Nanopore\defn{Sequenziamento long-read (PacBio, Oxford Nanopore)}{Tecnologie di sequenziamento che producono read full-length dei trascritti, fornendo un'annotazione completa delle isoforme non disponibile dai read brevi $3'$-biased.} ancorerebbe le chiamate DTU a sequenze complete dei trascritti.
+
+Questo approccio ibrido potrebbe validare le previsioni computazionali mantenendo la scalabilità a campioni di dimensione di popolazione.
+
+    \item \textbf{Analisi sensibile alla traiettoria}: il clustering attuale assume popolazioni cellulari discrete, ma la differenziazione è continua. Modellare le proporzioni delle isoforme lungo traiettorie di pseudotempo\defn{Pseudotempo}{Un ordinamento monodimensionale delle cellule lungo una traiettoria continua di sviluppo o differenziazione, che cattura transizioni graduali anziché popolazioni discrete.} (ad esempio adattando il framework di COTAN alla regressione anziché al confronto categoriale) potrebbe rivelare pattern dinamici di switch durante le transizioni.
+
+    \item \textbf{Estensione all'espressione allele-specifica}: l'approccio a tabelle di contingenza di COTAN si estende naturalmente a varianti fase. Rilevare un uso delle isoforme sbilanciato per allele collegherebbe la genetica regolatoria (eQTL, sQTL)\defn{eQTL / sQTL}{Varianti genomiche che influenzano misurabilmente l'espressione genica (eQTL) o lo splicing e l'uso delle isoforme (sQTL); collegarle agli switch di isoforma a singola cellula connette la genetica di popolazione con la regolazione.} agli esiti dello splicing nelle singole cellule---ponendo un ponte tra genomica di popolazione e regolazione dei trascritti.
+
+    \item \textbf{Benchmark contro strumenti DTU bulk}: un confronto sistematico con rMATS, SUPPA2 e DRIMSeq \cite{love2018swimming, draper2025selecting} su pseudo-bulk appaiati collocherebbe sensibilità e specificità nel giusto contesto. Questo benchmark potrebbe individuare i regimi in cui i metodi a singola cellula aggiungono valore unico e quelli in cui l'aggregazione è sufficiente.
+\end{enumerate}
+
+Queste estensioni restano oltre lo scopo di questa tesi, ma dimostrano che COTAN a livello di trascritto non è una soluzione definitiva: esso stabilisce piuttosto una prova di concetto per un'analisi delle isoforme robusta alla sparsità nelle singole cellule. La flessibilità del framework suggerisce ulteriori adattamenti man mano che emergono nuovi tipi di dati e nuove domande biologiche.
+
+\section*{Sintesi}
+
+Questo capitolo ha presentato i risultati del rilevamento DTU dall'applicazione di COTAN a dati scRNA-seq a livello di trascritto. Risultati principali:
+\begin{itemize}
+    \item 21 candidati DTU (umano) e 46 candidati DTU (topo) identificati con confidenza statistica.
+    \item I principali hit (Meg3, Malat1, TPM1) sono coerenti con biologia nota nonostante i vincoli del bias 3' \cite{ghanam2023malat1, xue2012specialized}.
+    \item La strategia di clustering influenza quali eventi vengono rilevati: il livello di trascritto rivela struttura a grana fine, il livello genico fornisce robustezza per i segnali deboli.
+\end{itemize}
+
+Il capitolo successivo riassume queste conclusioni e delinea i contributi più ampi della tesi alla genomica computazionale.
