@@ -11,3 +11,11 @@ main.pdf
 main.synctex.gz
 .overleaf/
 thesis_overleaf.zip
+
+# Third-party papers — copyrighted, not redistributed in the public repo
+docs/COTAN_full_doc.pdf
+docs/COTAN_full_doc.txt
+docs/COTAN_paper.pdf
+docs/COTAN_paper.txt
+docs/COTAN_paper_v2.pdf
+docs/COTAN_paper_v2.txt
