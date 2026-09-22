@@ -7,7 +7,6 @@
 *.blg
 *.bbl
 build/
-main.pdf
 main.synctex.gz
 .overleaf/
 thesis_overleaf.zip
