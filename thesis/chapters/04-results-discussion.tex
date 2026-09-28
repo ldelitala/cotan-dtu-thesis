@@ -4,7 +4,7 @@ This chapter presents the findings from applying transcript-level COTAN to scRNA
 
 \section{Dataset Quality Assessment via GDI}
 
-Before DTU calls can be interpreted, the clustering must be shown to capture biological structure rather than technical noise. The Global Differentiation Index (GDI) provides this validation by measuring cluster homogeneity and marker gene specificity.
+Before DTU calls can be interpreted, the clustering must be shown to capture biological structure rather than technical noise. The Global Differentiation Index (GDI), defined in Section~\ref{sec:cotan-framework}, provides this validation.
 
 \subsection*{Transcript-level Clustering Quality}\label{sec:gdi-transcript}
 
@@ -69,13 +69,11 @@ The algorithm from Section~\ref{sec:methods-dtu-algorithm} was applied to both h
 
 \subsection*{Human Dataset Findings (Arigoni)}\label{sec:results-human}
 
-The human cell line mixture provided ground-truth validation through known biology. After thresholding at $\tau = 0.2$:
+The human cell line mixture provided ground-truth validation through known biology. Of the 4958 genes carrying at least two detected transcripts, 430 retain at least one significant mutually exclusive pair\footnote{Counted by \texttt{extract\_dtu\_candidates()} and recorded in the run log (\texttt{results/arrigoni/logs/}); the exported \texttt{dtu\_candidates.csv} holds only the 21 survivors.}. After thresholding at $\tau = 0.2$:
 \begin{itemize}
     \item \textbf{430 genes with significant mutually exclusive isoform pairs} ($p < 0.05$)
     \item \textbf{21 DTU candidates across 9 genes} passing the bidirectional contrast threshold
 \end{itemize}
-
-The higher $\tau$ value reflects well-defined cell line clusters with strong separation, allowing stricter filtering for confident calls.
 
 Representative findings:
 \begin{enumerate}
@@ -88,7 +86,7 @@ The relatively small final candidate list (9 genes) reflects the algorithm's con
 
 \subsection*{Mouse Dataset Findings (Ding)}\label{sec:results-mouse}
 
-For mouse brain tissue, a lower threshold ($\tau = 0.05$) was applied to capture subtler transitions along differentiation trajectories:
+For mouse brain tissue a lower threshold, $\tau = 0.05$, was applied:
 \begin{itemize}
     \item \textbf{14 genes with significant pairs}
     \item \textbf{46 DTU candidates across 8 genes} after contrast filtering
@@ -109,22 +107,7 @@ Representative findings:
 
 \subsection*{Robustness Analysis: Shared vs Exclusive Events}\label{sec:robustness}
 
-DTU detection was re-run using gene-derived cluster labels on the same transcript matrix, and the resulting event lists were compared across both clustering strategies:
-
-\begin{table}[htbp]
-\centering
-\begin{tabular}{lcc}
-    \toprule
-    & \textbf{Transcript Clustering} & \textbf{Gene Clustering} \\
-    \midrule
-    Total DTU pairs detected & 46 & 46 \\
-    \bottomrule
-\end{tabular}
-\caption{DTU event totals under the two clustering strategies (mouse dataset).}
-\label{tab:dtu-robustness}
-\end{table}
-
-Event composition breakdown:
+DTU detection was re-run using gene-derived cluster labels on the same transcript matrix, and the resulting event lists were compared across both clustering strategies. Both partitionings returned the same total, 46 DTU pairs; their composition differed:
 \begin{itemize}
     \item \textbf{Shared events}: Majority of pairs detected by both methods, including Meg3 and Malat1---these represent strong signals surviving regardless of partitioning scheme.
     
@@ -144,6 +127,23 @@ The interpretation:
 
 This robustness analysis confirms that while the strongest signals are cluster-agnostic, subtle isoform switches reveal themselves only under appropriate partitioning schemes. The choice of clustering strategy is not merely technical---it shapes which biology becomes visible.
 
+\subsection*{Threshold Sensitivity: The Tau Sweep}\label{sec:tau-sweep}
+
+The candidate count depends on the contrast threshold $\tau$. To make the choice principled rather than arbitrary, the analysis re-runs the DTU extraction over a fine grid of $\tau$ values (0.005 to 0.3 at step 0.005) and records, at each threshold, the number of accepted events, the unique genes behind them, and how many survive the strictest threshold that still yields at least ten events (the robust core).
+
+Two properties of the sweep matter for interpretation. First, the event count is monotone decreasing in $\tau$---a sanity check that the extraction responds predictably to the threshold. Second, the fraction of accepted events belonging to the robust core (\texttt{frac\_in\_core}) rises toward one as $\tau$ approaches the core threshold; a plateau in this fraction marks the point where further relaxation adds only weak, non-core switches.
+
+Figure~\ref{fig:tau-sweep} shows the Arrigoni sweep. The bulk of significant pairs decays smoothly and steeply, from 2006 at $\tau = 0.005$ to 21 at $\tau = 0.2$, reflecting the homogeneous cell-line mixture in which every isoform pair carries some reciprocal contrast and the contrast spectrum is dense and continuous. A stable plateau nonetheless emerges at $\tau = 0.25$: ten events, all belonging to the robust core, hold unchanged through $\tau = 0.26$. The published threshold $\tau = 0.2$ reproduces the 21 reported candidates and sits just below this plateau, so the reported human result is anchored at the edge of the stable region rather than in the smooth tail. The mouse sweep yields stepwise plateaus instead (46 events at $\tau = 0.05$, stable at 41 and 36 across wider intervals), consistent with heterogeneous tissue in which a few dominant high-contrast switches dominate and the tail is sparse.
+
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=0.8\textwidth]{arrigoni_tau_sweep.png}
+    \caption{Tau sensitivity sweep for the human dataset: DTU events (blue) and robust-core events (orange) versus the minimum DEA contrast threshold $\tau$. A stable plateau appears at $\tau = 0.25$ with a ten-event core; the published $\tau = 0.2$ (dashed) reproduces the 21 reported candidates.}
+    \label{fig:tau-sweep}
+\end{figure}
+
+The plateau provides an empirical anchor for $\tau$: the reported thresholds (0.2 human, 0.05 mouse) were chosen within or adjacent to stable regions, so the final candidate lists are not an artifact of a single fragile threshold value. The sweep does not, however, replace a permutation-based null distribution; it remains an internal-consistency check on how the accepted set changes with the threshold.
+
 \section{Discussion}\label{sec:discussion}
 
 These findings are now set within their broader methodological and biological context.
@@ -158,9 +158,9 @@ Despite encouraging results, several constraints temper interpretation:
 \begin{itemize}
     \item \textbf{3'-bias invisibility}: Alternative splicing events occurring in transcript mid-regions remain undetectable when only \gls{threePrimeEnd}s are sequenced. The DTU candidates found here represent a subset---those where isoforms differ at their terminal exons or 3' ends.
 
-    \item \textbf{EM rounding effects}: Fractional EM assignments were rounded to integers for COTAN compatibility. Low-abundance isoforms with small fractional counts may be distorted by this discretization, potentially introducing false negatives or altered contrast values.
+    \item \textbf{EM rounding effects}: Fractional EM assignments were rounded to integers for COTAN compatibility (Section~\ref{sec:pipeline}). Low-abundance isoforms with small fractional counts may be distorted by this discretization, potentially introducing false negatives or altered contrast values.
 
-    \item \textbf{Threshold sensitivity}: The choice of $\tau$ lacks formal statistical grounding. While empirical tuning produced reasonable candidate numbers, a permutation-based null distribution would provide calibrated $p$-values rather than arbitrary thresholds.
+    \item \textbf{Threshold sensitivity}: The choice of $\tau$ lacks formal statistical grounding. The tau sweep (Section~\ref{sec:tau-sweep}) anchors the threshold empirically at a stable plateau, but a permutation-based null distribution would still provide calibrated $p$-values rather than a consistency-based choice.
 
     \item \textbf{Lack of orthogonal validation}: Without long-read sequencing or targeted RT-PCR\defn{RT-PCR}{Reverse-transcription polymerase chain reaction: a lab technique that experimentally confirms whether a specific isoform is present, used as an orthogonal check on computational DTU calls.} confirmation, false positive rates remain estimated from internal consistency (shared vs exclusive events) rather than ground truth.
 
@@ -182,4 +182,4 @@ This hybrid approach could validate computational predictions while scaling to p
     \item \textbf{Benchmarking against bulk DTU tools}: Systematic comparison with rMATS, SUPPA2, and DRIMSeq \cite{love2018swimming, draper2025selecting} on matched pseudo-bulks would contextualize sensitivity and specificity. This benchmark could identify regimes where single-cell methods add unique value versus when aggregation suffices.
 \end{enumerate}
 
-These extensions remain beyond the scope of this thesis but demonstrate that transcript-level COTAN is not a final solution---rather, it establishes proof-of-concept for sparsity-robust isoform analysis in single cells. The framework's flexibility suggests further adaptations as new data types and biological questions emerge.
+These extensions remain beyond the scope of this thesis, but they indicate that the framework admits further adaptation as new data types and biological questions emerge.
