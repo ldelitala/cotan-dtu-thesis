@@ -2,6 +2,8 @@
 
 \section{Dataset Selection}
 
+The dataset search was also shaped by the tooling chosen downstream. The analysis pipeline relies on \texttt{nf-core/scrnaseq}\cite{ewels2020nfcore} (Section~\ref{sec:pipeline}), adopted because it is an all-in-one, opinionated workflow that hides the wiring of each stage---download, indexing, alignment, quantification---behind a single invocation, lowering the entry barrier for an analyst new to the field. That choice carries a direct consequence for dataset selection: \texttt{nf-core/scrnaseq} supports barcode-based protocols only, with the 10x Genomics\cite{zheng2017massively} 3' chemistries as the supported family, so any dataset analysed here must come from that chemistry family.
+
 \subsection*{Starting from COTAN Datasets}
 
 Rather than searching the Gene Expression Omnibus (GEO)\defn{Gene Expression Omnibus (GEO)}{NCBI's public database of published gene-expression datasets. It stores raw and processed data for re-analysis.}\cite{barrett2013geo} ad hoc, the search started from the curated collection at \url{https://seriph78.github.io/COTAN_Datasets_analysis/}. This resource offers an advantage that matters here: its quality is pre-validated, since the same collections were used in COTAN's original benchmarking papers, which confirms that they work with the framework and carry no major technical artifacts.
@@ -14,7 +16,7 @@ The consequence is that transcript matrices must be built from the \gls{fastq} f
 
 \subsection*{From the Collection to the Final Datasets}
 
-Building those matrices requires a quantification pipeline, and the pipeline imposes a chemistry constraint of its own. \texttt{nf-core/scrnaseq}\cite{ewels2020nfcore} (Section~\ref{sec:pipeline}) handles barcode-based protocols only, with the 10x Genomics\cite{zheng2017massively} 3' chemistries as the supported family. Of the COTAN collection, only the Arigoni human cell-line mixture (GSE243665\cite{arigoni2024benchmark}) and the Ding mouse brain dataset (GSE132044\cite{ding2020systematic}) satisfy both that chemistry requirement and the availability of published barcode lists. Those two datasets are therefore the ones analysed here.
+Given the 3' chemistry constraint above, of the COTAN collection only the Arigoni human cell-line mixture (GSE243665\cite{arigoni2024benchmark}) and the Ding mouse brain dataset (GSE132044\cite{ding2020systematic}) satisfy both that chemistry requirement and the availability of published barcode lists. Those two datasets are therefore the ones analysed here.
 
 \section{Transcript Matrix Construction Pipeline}\label{sec:pipeline}
 
@@ -65,7 +67,7 @@ This modification is \textbf{reversible}: restoring standard index files returns
 
 \subsection*{Custom Nextflow Pipeline}
 
-To make this workflow reproducible across datasets, it was automated with \textbf{Nextflow}\cite{ditommaso2017nextflow}, a domain-specific language for computational pipelines that handles parallelization and checkpointing. The resulting wrapper calls nf-core/scrnaseq (v4.2.0), a community-maintained scRNA-seq analysis pipeline with built-in support for \texttt{simpleaf}. Adopting nf-core was itself a deliberate choice: as an all-in-one, opinionated workflow it hides the wiring of each stage---download, indexing, alignment, quantification---behind a single invocation, lowering the entry barrier for an analyst new to the field, and its containerized modules standardize the runtime across datasets.
+To make this workflow reproducible across datasets, it was automated with \textbf{Nextflow}\cite{ditommaso2017nextflow}, a domain-specific language for computational pipelines that handles parallelization and checkpointing. The resulting wrapper calls nf-core/scrnaseq (v4.2.0), a community-maintained scRNA-seq analysis pipeline with built-in support for \texttt{simpleaf}. This choice provides error handling, containerized dependencies, and standard configuration across datasets.
 
 The custom automation script:
 
