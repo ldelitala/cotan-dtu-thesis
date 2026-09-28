@@ -48,30 +48,30 @@ Two pseudo-aligners dominate single-cell transcript quantification:
     \end{tabular}
 \end{table}
 
-alevin-fry (\texttt{simpleaf} mode, part of Salmon) was selected for three reasons. Its UMI handling is superior, since single-cell data relies on \glspl{umi} to correct \gls{pcr} amplification bias and the alevin-fry error model distinguishes true UMIs from sequencing errors more reliably. Reads compatible with multiple transcripts are assigned probabilistically via Expectation-Maximization (EM)\cite{dempster1977maximum} rather than split uniformly, which preserves the relative abundance signals that downstream analysis depends on. Finally, \defn{nf-core}{A community repository of standardised, peer-reviewed Nextflow analysis pipelines.}nf-core/scrnaseq (v4.2.0) supports \texttt{simpleaf} natively, with fewer configuration quirks than the kallisto alternatives.
+The \texttt{simpleaf} framework\cite{he2023simpleaf}, which orchestrates \texttt{alevin-fry} for quantification and \texttt{piscem} for indexing, was selected for three reasons. Its UMI handling is superior, since single-cell data relies on \glspl{umi} to correct \gls{pcr} amplification bias and the alevin-fry error model distinguishes true UMIs from sequencing errors more reliably. Reads compatible with multiple transcripts are assigned probabilistically via Expectation-Maximization (EM)\cite{dempster1977maximum} rather than split uniformly, which preserves the relative abundance signals that downstream analysis depends on. Finally, \defn{nf-core}{A community repository of standardised, peer-reviewed Nextflow analysis pipelines.}nf-core/scrnaseq (v4.2.0) supports \texttt{simpleaf} natively, with fewer configuration quirks than the kallisto alternatives.
 
 The EM mode matters: \texttt{parsimony-em}\defn{parsimony-em}{An EM mode that assigns each multi-mapping read to the smallest sufficient set of transcripts.} assigns multi-mapping reads to the minimal set of transcripts consistent with the observed data. This produces fractional counts, which are rounded to integers before COTAN ingests the matrix.
 
 \subsection*{The Modification Process (Reproducible Steps)}\label{sec:modification-process}
 
-Standard alevin-fry\cite{he2022alevin} output collapses to gene level by default via transcript-to-gene mapping\defn{Transcript-to-gene (t2g) mapping}{A file pairing each transcript with its parent gene; replacing it with an identity mapping prevents gene-level collapse.}. To extract transcript counts, the index files were modified before alignment:
+Standard alevin-fry\cite{he2022alevin} output collapses to gene level by default via transcript-to-gene mapping\defn{Transcript-to-gene (t2g) mapping}{A file pairing each transcript with its parent gene; replacing it with an identity mapping prevents gene-level collapse.}. To extract transcript counts, the index files were modified before alignment, following the identity-mapping route discussed in the \texttt{simpleaf} issue tracker\footnote{\url{https://github.com/COMBINE-lab/simpleaf/issues/115}}:
 
 \begin{enumerate}
-    \item \textbf{Replace \texttt{t2g.txt} with an identity mapping}:
+    \item \textbf{Replace \texttt{t2g\_3col.tsv} with an identity mapping}:
 {\small\begin{verbatim}
 # Original: ENSMUST00000193814  ENSMUSG00000067548  # gene
 # Modified: ENSMUST00000193814  ENSMUST00000193814  # itself
 \end{verbatim}}
     This prevents the final aggregation step that sums isoforms into genes.
     
-    \item \textbf{Remove \texttt{gene\_id\_to\_names.txt}}: The nf-core pipeline expects this file for annotation. Deleting it causes a controlled exit at the annotation stage, after transcript counts have already been written to disk and can be salvaged.
+    \item \textbf{Remove \texttt{gene\_id\_to\_name.tsv}}: The nf-core pipeline expects this file for annotation. In practice the run then halts at the annotation step, after the transcript counts have already been written to disk; those counts are kept and carried into the analysis.
 \end{enumerate}
 
 This modification is \textbf{reversible}: restoring standard index files returns gene-level quantification without re-running alignment. It adds minimal computational overhead (index editing takes seconds) while enabling transcript-resolution output from a pipeline designed for genes.
 
 \subsection*{Custom Nextflow Pipeline}
 
-To make this workflow reproducible across datasets, it was automated with \textbf{Nextflow}\cite{ditommaso2017nextflow}, a domain-specific language for computational pipelines that handles parallelization and checkpointing. The resulting wrapper calls nf-core/scrnaseq (v4.2.0), a community-maintained scRNA-seq analysis pipeline with built-in support for Salmon/simpleaf. This choice provides error handling, containerized dependencies, and standard configuration across datasets.
+To make this workflow reproducible across datasets, it was automated with \textbf{Nextflow}\cite{ditommaso2017nextflow}, a domain-specific language for computational pipelines that handles parallelization and checkpointing. The resulting wrapper calls nf-core/scrnaseq (v4.2.0), a community-maintained scRNA-seq analysis pipeline with built-in support for \texttt{simpleaf}. This choice provides error handling, containerized dependencies, and standard configuration across datasets.
 
 The custom automation script:
 
@@ -81,14 +81,16 @@ The custom automation script:
     \item \textbf{Automated steps}:
     \begin{enumerate}
         \item Download FASTQ files via \texttt{sra-tools}\cite{leinonen2011sra}.
-        \item Build or reuse transcriptome index with \texttt{salmon}.
-        \item Apply \texttt{t2g.txt} modification if transcript-level output is requested.
+        \item Build or reuse the index with \texttt{simpleaf} (its \texttt{piscem} back-end), in either a gene-level or a transcript-level mode.
+        \item Apply the identity-mapping modification if transcript-level output is requested.
         \item Execute nf-core/scrnaseq (v4.2.0) with \texttt{simpleaf}.
-        \item Format outputs for COTAN ingestion (matrix and metadata).
+        \item Produce the count matrix and its metadata.
     \end{enumerate}
 
-    \item \textbf{GitHub repository}: \url{https://github.com/TODO/GITHUB_LINK}. The pipeline includes documentation, example configuration files, and test cases.
+    \item \textbf{GitHub repository}: \url{https://github.com/ldelitala/sc-isoform-cotan}. The pipeline includes documentation, example configuration files, and test cases.
 \end{itemize}
+
+The workflow ends at the count matrix. Quality filtering and the COTAN analysis are performed afterwards in the R analysis layer, keeping the two concerns separate.
 
 This automation reduces the analysis from a multi-day manual process to a single command-line invocation. Future researchers can apply it to new datasets without re-implementing the workflow.
 
@@ -100,7 +102,7 @@ Raw count matrices contain noise that must be removed before statistical analysi
 
 \subsection*{Cell-level Filters}
 
-Cells were filtered using metadata from the original GEO publications. The Arigoni dataset (GSE243665\cite{arigoni2024benchmark}) and Ding dataset (GSE132044\cite{ding2020systematic}) both provide lists of cells that passed their quality control thresholds, and restricting the analysis to those known-good barcodes avoids a second QC pipeline that could introduce inconsistencies. Published studies typically filter on a minimum UMI count per cell, which removes empty droplets; a maximum mitochondrial read percentage\defn{Mitochondrial read percentage}{The fraction of a cell's reads coming from mitochondrial genes; abnormally high values flag dying or damaged cells.}, which removes dying cells; and a gene detection threshold, since cells with too few detected genes may be doublets\defn{Doublet}{Two cells accidentally captured inside one droplet, producing a mixed signal that looks like a single abnormal cell.} or otherwise low quality. Reusing their filtering ensures comparability and reduces methodological drift.
+Cells were filtered using metadata from the original GEO publications. The Arigoni dataset (GSE243665\cite{arigoni2024benchmark}) and Ding dataset (GSE132044\cite{ding2020systematic}) both provide lists of cells that passed their quality control thresholds, and restricting the analysis to those known-good barcodes avoids a second QC pipeline that could introduce inconsistencies. Published studies typically filter on a minimum UMI count per cell, which removes empty droplets; a maximum mitochondrial read percentage\defn{Mitochondrial read percentage}{The fraction of a cell's reads coming from mitochondrial genes; abnormally high values flag dying or damaged cells.}, which removes dying cells; and a gene detection threshold, since cells with too few detected genes may be doublets, or otherwise low quality. Reusing their filtering ensures comparability and reduces methodological drift.
 
 Final cell counts: 29k human (Arigoni), 4k mouse (Ding).
 
@@ -140,7 +142,7 @@ Addressing all three concerns establishes whether transcript-level COTAN is both
 
 \section{DTU Detection Algorithm}\label{sec:methods-dtu-algorithm}
 
-The core contribution of this thesis is an algorithm that identifies \gls{dtu} events from sparse single-cell data using COTAN's statistical framework\cite{galfre2021cotan}. Each step is stated here as it is implemented; the biological justification for the two filters is given in Section~\ref{sec:mutual-exclusivity}.
+A gene may express two isoforms whose relative abundance flips from one cell type to the next, yet in $3'$-biased droplet data that switch is buried under zeros: the short terminal reads rarely sample the internal splice junctions that would let a standard gene-level tool see the difference. The algorithm recovers this signal by turning the biological question into a statistical one---reusing COTAN's gene-level machinery, the contingency table, the \gls{coexpression} coefficient, and the differential-expression contrast, and applying it at transcript resolution so that a mutually exclusive isoform pair is recognised by the same independence test that already copes with sparsity\cite{galfre2021cotan}. Each step is stated here as it is implemented; the biological justification for the two filters is given in Section~\ref{sec:mutual-exclusivity}.
 
 \subsection*{Step-by-Step Procedure}
 
@@ -163,11 +165,9 @@ For each gene with $k \ge 2$ detected isoforms:
     \begin{itemize}
         \item At least one cluster with $\Delta > \tau$.
         \item At least one cluster with $\Delta < -\tau$.
-        \item Thresholds:\defn{$\tau$ (contrast threshold)}{The minimum absolute DEA contrast between two isoforms required to count a cluster toward a switch.} $\tau = 0.2$ (human, well-defined cell lines), $\tau = 0.05$ (mouse, continuous differentiation).
+        \item Thresholds:\defn{$\tau$ (contrast threshold)}{The minimum absolute DEA contrast between two isoforms required to count a cluster toward a switch.} $\tau = 0.2$ (human), $\tau = 0.05$ (mouse), as tuned in Section~\ref{sec:tuning-tau}.
     \end{itemize}
 \end{enumerate}
-
-The two filters are ordered deliberately, and the reason they isolate genuine switches rather than one-sided enrichment is argued in Section~\ref{sec:mutual-exclusivity}; this section documents only the procedure itself.
 
 The algorithm outputs a list of gene-isoform pairs with evidence for cluster-specific differential usage, ranked by statistical significance and effect size ($|\Delta|$).
 

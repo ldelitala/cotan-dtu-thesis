@@ -69,41 +69,15 @@ The algorithm from Section~\ref{sec:methods-dtu-algorithm} was applied to both h
 
 \subsection*{Human Dataset Findings (Arigoni)}\label{sec:results-human}
 
-The human cell line mixture provided ground-truth validation through known biology. Of the 4958 genes carrying at least two detected transcripts, 430 retain at least one significant mutually exclusive pair\footnote{Counted by \texttt{extract\_dtu\_candidates()} and recorded in the run log (\texttt{results/arrigoni/logs/}); the exported \texttt{dtu\_candidates.csv} holds only the 21 survivors.}. After thresholding at $\tau = 0.2$:
-\begin{itemize}
-    \item \textbf{430 genes with significant mutually exclusive isoform pairs} ($p < 0.05$)
-    \item \textbf{21 DTU candidates across 9 genes} passing the bidirectional contrast threshold
-\end{itemize}
+The human cell line mixture provided ground-truth validation through known biology. Of the 4958 genes carrying at least two detected transcripts, 430 retain at least one significant mutually exclusive pair\footnote{Counted by \texttt{extract\_dtu\_candidates()} and recorded in the run log (\texttt{results/arrigoni/logs/}); the exported \texttt{dtu\_candidates.csv} holds only the 21 survivors.}, yet after the bidirectional contrast threshold $\tau = 0.2$ only 21 candidates survive, across just 9 genes. That collapse from 430 to 9 is the algorithm working as designed: mutual exclusivity alone admits hundreds of pairs, but only a handful also flip their enrichment between clusters, and it is this second condition---a pair must be preferred in one cell type and disfavoured in another---that separates a genuine switch from a statistical curiosity.
 
-Representative findings:
-\begin{enumerate}
-    \item \textbf{TPM1 (tropomyosin 1)}: Multiple isoforms show opposing preferences across cell lines. Isoform A is enriched in PC9 and DV90; isoform B is dominant in A549 and HCC78.
-    
-    \item \textbf{RPL10, RPS24 (ribosomal proteins)}: Unexpected DTU signals in ribosomal genes suggest cell-type-specific translation regulation---consistent with the heterogeneity of ribosomal composition underlying specialised translation \cite{xue2012specialized}.
-\end{enumerate}
-
-The relatively small final candidate list (9 genes) reflects the algorithm's conservative design: requiring both \gls{mutualExclusivity} and bidirectional contrast filters out spurious associations.
+The surviving candidates cohere into a single story. TPM1, the strongest call, is a tropomyosin whose isoforms oppose each other across the cell lines: one isoform is enriched in PC9 and DV90 while the other dominates A549 and HCC78, a reciprocal preference that reads as cell-type-specific cytoskeletal tuning. Alongside it sit the ribosomal proteins RPL10 and RPS24, whose unexpected DTU signal points toward cell-type-specific translation regulation---consistent with the heterogeneity of ribosomal composition underlying specialised translation \cite{xue2012specialized}. The two themes are biologically distinct but converge in method: in both cases a single gene carries two isoforms that the same cell types use in opposite directions, and it is that convergence, not any single gene, that validates the detector. The final list is small precisely because the algorithm demands both \gls{mutualExclusivity} and a bidirectional contrast, and that conservative design is what lets nine genes carry the whole human result.
 
 \subsection*{Mouse Dataset Findings (Ding)}\label{sec:results-mouse}
 
-For mouse brain tissue a lower threshold, $\tau = 0.05$, was applied:
-\begin{itemize}
-    \item \textbf{14 genes with significant pairs}
-    \item \textbf{46 DTU candidates across 8 genes} after contrast filtering
-\end{itemize}
+For mouse brain tissue a lower threshold, $\tau = 0.05$, was applied, and the balance shifts: only 14 genes carry significant pairs, yet 46 candidates survive across 8 genes. The inversion is itself informative---fewer initial pairs but more survivors means mouse cortex switches are gradual rather than sharp, so a relaxed threshold admits many weak but real transitions that the strict human cutoff would have discarded.
 
-The larger candidate count despite fewer initial significant pairs suggests that mouse brain tissue exhibits more gradual \gls{isoformSwitch} patterns rather than sharp cell-line-level switches.
-
-Representative findings:
-\begin{enumerate}
-    \item \textbf{Meg3 (maternally expressed gene 3)}: Long non-coding RNA\defn{Long non-coding RNA (lncRNA)}{A long RNA molecule that does not encode a protein but regulates gene expression, splicing, and development.} with a documented role in neuronal differentiation. Isoform A dominates early progenitor clusters; isoform B is enriched in differentiated neuron clusters, a switch that tracks the differentiation trajectory rather than a sharp binary state.
-    
-    \item \textbf{Malat1 (metastasis-associated lung adenocarcinoma transcript 1)}: Another highly conserved lncRNA involved in splicing regulation. Shows cluster-specific isoform preferences, consistent with the alternative 3$'$ isoform usage documented for this locus \cite{ghanam2023malat1}.
-
-    \item \textbf{Srrm2 (serine/arginine-rich splicing factor 2)}: Encodes a core spliceosome\defn{Spliceosome}{The molecular machine that removes introns and joins exons during splicing.} component. Its own DTU suggests feedback regulation---alternative splicing of splicing factors is a known mechanism for tuning isoform landscapes across cell states.
-
-    \item \textbf{Ttc14 (tetratricopeptide repeat domain 14)}: Novel candidate with no prior DTU literature. Requires \gls{orthogonalValidation} to confirm biological significance.
-\end{enumerate}
+The candidates trace an arc across the tissue. Meg3, a long non-coding RNA\defn{Long non-coding RNA (lncRNA)}{A long RNA molecule that does not encode a protein but regulates gene expression, splicing, and development.} with a documented role in neuronal differentiation, switches along the differentiation trajectory itself: isoform A dominates early progenitor clusters while isoform B is enriched in differentiated neurons---a transition that tracks a continuous gradient rather than a binary state. Malat1, another highly conserved lncRNA involved in splicing regulation, shows the same cluster-specific preference, consistent with the alternative 3$'$ isoform usage documented for this locus \cite{ghanam2023malat1}. The two lncRNAs are neighbours in function---both non-coding, both switching with differentiation---and together they anchor the mouse result in established biology. The arc then turns inward: Srrm2 encodes a core spliceosome\defn{Spliceosome}{The molecular machine that removes introns and joins exons during splicing.} component, and its own DTU suggests feedback regulation, alternative splicing of splicing factors being a known mechanism for tuning isoform landscapes across cell states. Finally, Ttc14, a novel candidate with no prior DTU literature, requires \gls{orthogonalValidation} to confirm its biological significance---and its presence is a reminder that the method also surfaces calls no published study has anticipated.
 
 \subsection*{Robustness Analysis: Shared vs Exclusive Events}\label{sec:robustness}
 
@@ -133,7 +107,7 @@ The candidate count depends on the contrast threshold $\tau$. To make the choice
 
 Two properties of the sweep matter for interpretation. First, the event count is monotone decreasing in $\tau$---a sanity check that the extraction responds predictably to the threshold. Second, the fraction of accepted events belonging to the robust core (\texttt{frac\_in\_core}) rises toward one as $\tau$ approaches the core threshold; a plateau in this fraction marks the point where further relaxation adds only weak, non-core switches.
 
-Figure~\ref{fig:tau-sweep} shows the Arrigoni sweep. The bulk of significant pairs decays smoothly and steeply, from 2006 at $\tau = 0.005$ to 21 at $\tau = 0.2$, reflecting the homogeneous cell-line mixture in which every isoform pair carries some reciprocal contrast and the contrast spectrum is dense and continuous. A stable plateau nonetheless emerges at $\tau = 0.25$: ten events, all belonging to the robust core, hold unchanged through $\tau = 0.26$. The published threshold $\tau = 0.2$ reproduces the 21 reported candidates and sits just below this plateau, so the reported human result is anchored at the edge of the stable region rather than in the smooth tail. The mouse sweep yields stepwise plateaus instead (46 events at $\tau = 0.05$, stable at 41 and 36 across wider intervals), consistent with heterogeneous tissue in which a few dominant high-contrast switches dominate and the tail is sparse.
+Figure~\ref{fig:tau-sweep} maps that search across a landscape of thresholds. The bulk of significant pairs descends like a long, smooth slope---from 2006 at $\tau = 0.005$ to 21 at $\tau = 0.2$---a nearly featureless gradient that reflects the homogeneous cell-line mixture: every isoform pair carries some reciprocal contrast, so the terrain is a dense and continuous spectrum with no natural break. On such a slope any single threshold looks arbitrary, and this is exactly the trap the sweep is built to expose. As the eye climbs the landscape a highland finally appears: at $\tau = 0.25$ ten events, all belonging to the robust core, hold flat through $\tau = 0.26$---a genuine plateau, ground stable enough to stand on rather than a point on the slope. The published threshold $\tau = 0.2$ reproduces the 21 reported candidates and sits just below that highland, so the human result is anchored at the edge of stable ground rather than lost somewhere on the tail. The mouse terrain is different: it descends in steps, 46 events at $\tau = 0.05$ holding at 41 and 36 across wide intervals, because heterogeneous tissue is dominated by a few high-contrast switches with a sparse tail---so its plateaus are broad ledges, not a single summit.
 
 \begin{figure}[htbp]
     \centering
