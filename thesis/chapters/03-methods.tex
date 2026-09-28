@@ -65,7 +65,7 @@ This modification is \textbf{reversible}: restoring standard index files returns
 
 \subsection*{Custom Nextflow Pipeline}
 
-To make this workflow reproducible across datasets, it was automated with \textbf{Nextflow}\cite{ditommaso2017nextflow}, a domain-specific language for computational pipelines that handles parallelization and checkpointing. The resulting wrapper calls nf-core/scrnaseq (v4.2.0), a community-maintained scRNA-seq analysis pipeline with built-in support for \texttt{simpleaf}. This choice provides error handling, containerized dependencies, and standard configuration across datasets.
+To make this workflow reproducible across datasets, it was automated with \textbf{Nextflow}\cite{ditommaso2017nextflow}, a domain-specific language for computational pipelines that handles parallelization and checkpointing. The resulting wrapper calls nf-core/scrnaseq (v4.2.0), a community-maintained scRNA-seq analysis pipeline with built-in support for \texttt{simpleaf}. Adopting nf-core was itself a deliberate choice: as an all-in-one, opinionated workflow it hides the wiring of each stage---download, indexing, alignment, quantification---behind a single invocation, lowering the entry barrier for an analyst new to the field, and its containerized modules standardize the runtime across datasets.
 
 The custom automation script:
 
