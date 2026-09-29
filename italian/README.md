@@ -64,11 +64,11 @@ Se vuoi caricare su Overleaf:
 ## Manutenzione
 
 Per sincronizzare modifiche dalla versione inglese:
-1. Apri il file originale in `/Users/deli/Projects/thesis/chapters/`
+1. Apri il file originale in `/Users/deli/Projects/thesis/english/chapters/`
 2. Applica le stesse modifiche al file `-it.tex` corrispondente
 3. Ricompila e verifica il PDF
 
-I file senza suffisso in `chapters/` sono copie inglesi obsolete, usate in passato come base per il diff: la fonte di verità resta `/Users/deli/Projects/thesis/chapters/`.
+I file senza suffisso in `chapters/` sono copie inglesi obsolete, usate in passato come base per il diff: la fonte di verità resta `/Users/deli/Projects/thesis/english/chapters/`.
 
 ## Note di allineamento (19 settembre 2026)
 
