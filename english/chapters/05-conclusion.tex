@@ -1,6 +1,6 @@
 \chapter{Conclusions}
 
-This thesis established that COTAN's sparsity-robust contingency-table framework can be extended to transcript-level analysis, recovering within-gene exclusivity patterns indicative of Differential Transcript Usage (DTU) from sparse $3'$-biased single-cell \gls{rnaSeq} data. The key insight---that zero patterns carry reliable signal even in extremely sparse matrices---transfers successfully from gene co-expression to isoform \gls{mutualExclusivity} detection.
+This thesis established that COTAN's sparsity-robust contingency-table framework can be extended to transcript-level analysis, recovering within-gene exclusivity patterns indicative of Differential Transcript Usage (DTU) from sparse $3'$-biased single-cell \gls{rnaSeq} data.
 
 \section{Summary of Findings}
 
@@ -10,22 +10,32 @@ Applied to the two droplet datasets, the adapted framework returned detectable s
 
 This work has implications across three domains:
 
-\textbf{For computational genomics}: The success of contingency-table statistics at transcript resolution demonstrates that sparsity need not be treated as a problem to overcome (via imputation or log-transformation) but rather modeled directly. This philosophy may extend to other single-cell challenges---allele-specific expression, chromatin accessibility peak co-occurrence, and multi-modal integration.
+\textbf{For computational genomics}: The success of contingency-table statistics at transcript resolution demonstrates that sparsity can be modelled directly rather than overcome (Section~\ref{sec:cotan-framework}). This philosophy may extend to other single-cell challenges---allele-specific expression, chromatin accessibility peak co-occurrence, and multi-modal integration.
 
 \textbf{For isoform biology}: Detecting DTU in $3'$-biased data opens new analysis opportunities for existing large-scale datasets (e.g., Human Cell Atlas, Tabula Sapiens\defn{Human Cell Atlas / Tabula Sapiens}{Large international reference atlases of single-cell transcriptomes across human tissues, relied on 3'-biased droplet data and were therefore closed to isoform-level questions.}) that were previously closed to isoform-level questions. While sensitivity is limited compared to full-length protocols, the trade-off between cell numbers and coverage may favor droplet methods when statistical power from thousands of cells outweighs per-cell depth.
 
-\textbf{For COTAN framework development}: This thesis validates that COTAN's core design principles---direct modelling of zero counts and large-$N$ $\chi^2$ calibration of $p$-values---generalize beyond gene-level analysis. Future extensions to other single-cell modalities (ATAC-seq\defn{ATAC-seq}{Assay for Transposase-Accessible Chromatin: maps genome regions where chromatin is open, indicating regulatory activity.} peak co-occurrence, protein abundance correlations in CITE-seq\defn{CITE-seq}{A protocol that simultaneously measures RNA and surface proteins in the same single cells, enabling multi-modal analysis.}) appear feasible.
+\textbf{For COTAN framework development}: This thesis validates that COTAN's core design principles, set out in Section~\ref{sec:cotan-framework}, generalize beyond gene-level analysis. Future extensions to other single-cell modalities (ATAC-seq\defn{ATAC-seq}{Assay for Transposase-Accessible Chromatin: maps genome regions where chromatin is open, indicating regulatory activity.} peak co-occurrence, protein abundance correlations in CITE-seq\defn{CITE-seq}{A protocol that simultaneously measures RNA and surface proteins in the same single cells, enabling multi-modal analysis.}) appear feasible.
+
+\section{What This Work Leaves Behind}
+
+Beyond the findings, this thesis leaves a set of reusable artefacts, published together in the public repository that accompanies it.
+
+\textbf{An analysis library.} The \texttt{cotanisoform} R package collects the whole analysis path into documented functions: reading a count matrix, adapting it to COTAN, running the COTAN steps, extracting DTU candidates, and comparing runs. It can be installed and used on any single-cell dataset, independently of the two datasets studied here, and its logging layer lets a long run report its own progress and failures in one consistent trace.
+
+\textbf{A quantification pipeline.} The Nextflow pipeline (Section~\ref{sec:pipeline}) automates the path from raw reads to a count matrix, offering both the gene-level and the transcript-level index. Its steps run separately, so a re-run from an existing index does not repeat the download.
+
+\textbf{A reproducible analysis layer.} The driver scripts reproduce the complete analysis of a dataset from a single configuration file, one per dataset and feature level, so each reported table can be regenerated without interactive input.
+
+\textbf{Documentation and reference outputs.} The repository documents the method, the parameters behind each published table, and a parity script that re-derives the reported DTU tables from the stored objects, so a reader can check the results rather than take them on trust.
 
 \section{Limitations and Future Work}
 
 The constraints on these results---$3'$-bias invisibility, the absence of orthogonal validation, the heuristic threshold $\tau$, and EM rounding---are set out together with the directions they open in Section~\ref{sec:discussion}. The same underlying trade-off governs all four: sensitivity is bought with cells rather than coverage, so the value of the method grows as datasets do.
 
+On the computational side, the pipeline and the analysis remain two halves joined at the count matrix: the Nextflow workflow ends at the filtered matrix, and the R analysis is started separately. Folding the analysis into the workflow as one further step would let a single run cover the path from raw accessions to DTU candidates, which is the main engineering direction this work leaves open.
+
 A newer quantifier points the same way. SCALPEL\cite{ake2025scalpel} builds the transcript matrix from standard $3'$-based data by a different route from the EM step used here, and its authors report higher sensitivity and closer recovery of true isoform proportions than existing tools, with experimental validation. Substituting it for \texttt{parsimony-em} would test whether the downstream DTU calls sharpen, making it a natural extension of this framework.
 
 \section*{Final Remarks}
 
-This thesis demonstrates that transcript-level COTAN can reveal regulatory programs hidden to gene-centric analyses. The contingency-table framework provides a principled approach to sparse data analysis---one that respects the actual measurement process rather than imposing transformations designed for dense, normally distributed data.
-
-The path forward requires orthogonal validation and the complementary technologies set out in Section~\ref{sec:discussion} before isoform-aware single-cell methods move from proof-of-concept to standard practice.
-
-The framework established here provides a foundation for that future work---combining methodological rigor (contingency-table statistics), computational reproducibility (documented Nextflow pipeline), and biological validation (alignment with known isoform switches). Whether applied to neurogenesis, cancer evolution, or developmental biology, the core question remains: \textit{which transcripts are cells expressing, and how does that choice change across conditions?}
+This thesis demonstrates that transcript-level COTAN can reveal regulatory programs hidden to gene-centric analyses, and that a contingency-table approach to sparse data respects the measurement process rather than imposing transformations designed for dense, normally distributed data. The framework established here---methodological rigour, computational reproducibility and alignment with known isoform switches---provides a foundation for that future work, which still requires orthogonal validation and the complementary technologies set out in Section~\ref{sec:discussion}. Whether applied to neurogenesis, cancer evolution, or developmental biology, the core question remains: \textit{which transcripts are cells expressing, and how does that choice change across conditions?}

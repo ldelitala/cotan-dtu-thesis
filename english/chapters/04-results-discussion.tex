@@ -29,7 +29,7 @@ This confirms that transcript-level data contains sufficient signal for meaningf
 
 \subsection*{Gene vs Transcript Structure Comparison}
 
-Figure~\ref{fig:gdi_genes} shows the same cells clustered using standard gene counts (15 clusters). The different cluster resolution---more numerous but smaller groups compared to transcript clustering---suggests that aggregation to genes loses fine-grained structure.
+Figure~\ref{fig:gdi_genes} shows the same cells clustered using standard gene counts (15 clusters). The gene run reads the independent GEO gene matrix---28,692 features against the transcript matrix's 12,848---so its larger cluster count reflects the denser matrix, not a finer gene-level resolution.
 
 \begin{figure}[htbp]
     \centering
@@ -60,7 +60,7 @@ Figure~\ref{fig:confusion-matrix} shows the confusion matrix heatmap. Several pa
     \item \textbf{Selective merging}: Conversely, some adjacent transcript clusters merge in gene analysis, indicating that their differences rely on isoform-specific expression patterns rather than overall transcriptional activity.
 \end{itemize}
 
-The interpretation: transcript-level clustering reveals cellular substructure invisible to gene aggregation. This is precisely the regime where DTU detection should add value---if isoform switches distinguish cell states that genes alone cannot separate, then transcript-aware methods capture biologically relevant signals.
+The interpretation: across the two runs the counts differ (11 against 15) because the partitions come from different matrices---the transcript matrix is a sparser, feature-filtered view, the gene matrix a denser GEO count set---so the totals are not a resolution ranking. What the confusion matrix actually shows is agreement in the large and divergence in the particular: the dominant diagonal confirms both partitions recover the same broad populations, while the local splits and merges mark where isoform information changes the grouping. That is precisely the regime where DTU detection should add value---if isoform switches distinguish cell states that genes alone cannot separate, then transcript-aware methods capture biologically relevant signals.
 
 However, this raises a critical question: whether the detected DTU events hold across clustering strategies, or depend entirely on how cells are partitioned. The robustness analysis below answers it.
 
@@ -132,7 +132,7 @@ Despite encouraging results, several constraints temper interpretation:
 \begin{itemize}
     \item \textbf{3'-bias invisibility}: Alternative splicing events occurring in transcript mid-regions remain undetectable when only \gls{threePrimeEnd}s are sequenced. The DTU candidates found here represent a subset---those where isoforms differ at their terminal exons or 3' ends.
 
-    \item \textbf{EM rounding effects}: Fractional EM assignments were rounded to integers for COTAN compatibility (Section~\ref{sec:pipeline}). Low-abundance isoforms with small fractional counts may be distorted by this discretization, potentially introducing false negatives or altered contrast values.
+    \item \textbf{EM rounding effects}: Fractional EM assignments were rounded to integers for COTAN compatibility (Section~\ref{sec:data-filtering}). Low-abundance isoforms with small fractional counts may be distorted by this discretization, potentially introducing false negatives or altered contrast values.
 
     \item \textbf{Threshold sensitivity}: The choice of $\tau$ lacks formal statistical grounding. The tau sweep (Section~\ref{sec:tau-sweep}) anchors the threshold empirically at a stable plateau, but a permutation-based null distribution would still provide calibrated $p$-values rather than a consistency-based choice.
 
