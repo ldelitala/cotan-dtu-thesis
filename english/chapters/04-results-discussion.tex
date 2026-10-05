@@ -71,13 +71,13 @@ The algorithm from Section~\ref{sec:methods-dtu-algorithm} was applied to both h
 
 The human cell line mixture provided ground-truth validation through known biology. Of the 4958 genes carrying at least two detected transcripts, 430 retain at least one significant mutually exclusive pair\footnote{Counted by \texttt{extract\_dtu\_candidates()} and recorded in the run log (\texttt{results/arrigoni/logs/}); the exported \texttt{dtu\_candidates.csv} holds only the 21 survivors.}, yet after the bidirectional contrast threshold $\tau = 0.2$ only 21 candidates survive, across just 9 genes. That collapse from 430 to 9 is the algorithm working as designed: mutual exclusivity alone admits hundreds of pairs, but only a handful also flip their enrichment between clusters, and it is this second condition---a pair must be preferred in one cell type and disfavoured in another---that separates a genuine switch from a statistical curiosity.
 
-The surviving candidates cohere into a single story. TPM1, the strongest call, is a tropomyosin whose isoforms oppose each other across the cell lines: one isoform is enriched in PC9 and DV90 while the other dominates A549 and HCC78, a reciprocal preference that reads as cell-type-specific cytoskeletal tuning. Alongside it sit the ribosomal proteins RPL10 and RPS24, whose unexpected DTU signal points toward cell-type-specific translation regulation---consistent with the heterogeneity of ribosomal composition underlying specialised translation \cite{xue2012specialized}. The two themes are biologically distinct but converge in method: in both cases a single gene carries two isoforms that the same cell types use in opposite directions, and it is that convergence, not any single gene, that validates the detector. The final list is small precisely because the algorithm demands both \gls{mutualExclusivity} and a bidirectional contrast, and that conservative design is what lets nine genes carry the whole human result.
+The surviving candidates cohere into a single story. TPM1, the strongest call, is a tropomyosin whose isoforms oppose each other across the cell lines: one isoform is enriched in PC9 and DV90 while the other dominates A549 and HCC78, a reciprocal preference that reads as cell-type-specific cytoskeletal tuning. Alongside it sit RPS24 and SAT1, whose DTU signals point toward cell-type-specific translation regulation and metabolic rewiring, consistent with the heterogeneity of specialised translation \cite{xue2012specialized}. The two themes are biologically distinct but converge in method: in both cases a single gene carries two isoforms that the same cell types use in opposite directions, and it is that convergence, not any single gene, that validates the detector. The final list is small precisely because the algorithm demands both \gls{mutualExclusivity} and a bidirectional contrast, and that conservative design is what lets nine genes carry the whole human result. Section~\ref{sec:dtu-validation} grades these nine genes by the strength of their literature support.
 
 \subsection*{Mouse Dataset Findings (Ding)}\label{sec:results-mouse}
 
 For mouse brain tissue a lower threshold, $\tau = 0.05$, was applied, and the balance shifts: only 14 genes carry significant pairs, yet 46 candidates survive across 8 genes. The inversion is itself informative---fewer initial pairs but more survivors means mouse cortex switches are gradual rather than sharp, so a relaxed threshold admits many weak but real transitions that the strict human cutoff would have discarded.
 
-The candidates trace an arc across the tissue. Meg3, a long non-coding RNA\defn{Long non-coding RNA (lncRNA)}{A long RNA molecule that does not encode a protein but regulates gene expression, splicing, and development.} with a documented role in neuronal differentiation, switches along the differentiation trajectory itself: isoform A dominates early progenitor clusters while isoform B is enriched in differentiated neurons---a transition that tracks a continuous gradient rather than a binary state. Malat1, another highly conserved lncRNA involved in splicing regulation, shows the same cluster-specific preference, consistent with the alternative 3$'$ isoform usage documented for this locus \cite{ghanam2023malat1}. The two lncRNAs are neighbours in function---both non-coding, both switching with differentiation---and together they anchor the mouse result in established biology. The arc then turns inward: Srrm2 encodes a core spliceosome\defn{Spliceosome}{The molecular machine that removes introns and joins exons during splicing.} component, and its own DTU suggests feedback regulation, alternative splicing of splicing factors being a known mechanism for tuning isoform landscapes across cell states. Finally, Ttc14, a novel candidate with no prior DTU literature, requires \gls{orthogonalValidation} to confirm its biological significance---and its presence is a reminder that the method also surfaces calls no published study has anticipated.
+The candidates trace an arc across the tissue. Meg3, a long non-coding RNA\defn{Long non-coding RNA (lncRNA)}{A long RNA molecule that does not encode a protein but regulates gene expression, splicing, and development.} with a documented role in neuronal differentiation, shows a reciprocal isoform preference across cell clusters: isoform A dominates the early progenitor clusters while isoform B is enriched in differentiated neurons. Malat1, another highly conserved lncRNA involved in splicing regulation, shows the same cluster-specific preference, consistent with the alternative 3$'$ isoform usage documented for this locus \cite{ghanam2023malat1}. The two lncRNAs are neighbours in function---both non-coding, both switching with differentiation---and together they anchor the mouse result in established biology. The arc then turns inward: Srrm2 encodes a core spliceosome\defn{Spliceosome}{The molecular machine that removes introns and joins exons during splicing.} component, and its own DTU suggests feedback regulation, alternative splicing of splicing factors being a known mechanism for tuning isoform landscapes across cell states. Two further calls, Lrrc7 and Grin2b, are also consistent with the literature. By contrast, Ttc14 and Zfp941 are novel candidates with no prior DTU literature, and require \gls{orthogonalValidation} to confirm their biological significance---their presence is a reminder that the method also surfaces calls no published study has anticipated. Note that this reading is expressed in terms of discrete cluster preferences rather than a differentiation trajectory: the original study states that its samples were not appropriate for pseudotime analysis \cite{ding2020systematic}.
 
 \subsection*{Robustness Analysis: Shared vs Exclusive Events}\label{sec:robustness}
 
@@ -103,7 +103,7 @@ This robustness analysis confirms that while the strongest signals are cluster-a
 
 \subsection*{Threshold Sensitivity: The Tau Sweep}\label{sec:tau-sweep}
 
-The candidate count depends on the contrast threshold $\tau$. To make the choice principled rather than arbitrary, the analysis re-runs the DTU extraction over a fine grid of $\tau$ values (0.005 to 0.3 at step 0.005) and records, at each threshold, the number of accepted events, the unique genes behind them, and how many survive the strictest threshold that still yields at least ten events (the robust core).
+The candidate count depends on the contrast threshold $\tau$. The threshold was not derived from a statistical null distribution; it was first chosen pragmatically to yield a manageable candidate list---few enough events that each could be inspected and, where needed, validated experimentally, a range on the order of tens of events (Section~\ref{sec:tuning-tau}). To check that this pragmatic choice does not sit on a fragile edge, the analysis re-runs the DTU extraction over a fine grid of $\tau$ values (0.005 to 0.3 at step 0.005) and records, at each threshold, the number of accepted events, the unique genes behind them, and how many survive the strictest threshold that still yields at least ten events (the robust core).
 
 Two properties of the sweep matter for interpretation. First, the event count is monotone decreasing in $\tau$---a sanity check that the extraction responds predictably to the threshold. Second, the fraction of accepted events belonging to the robust core (\texttt{frac\_in\_core}) rises toward one as $\tau$ approaches the core threshold; a plateau in this fraction marks the point where further relaxation adds only weak, non-core switches.
 
@@ -116,7 +116,16 @@ Figure~\ref{fig:tau-sweep} maps that search across a landscape of thresholds. Th
     \label{fig:tau-sweep}
 \end{figure}
 
-The plateau provides an empirical anchor for $\tau$: the reported thresholds (0.2 human, 0.05 mouse) were chosen within or adjacent to stable regions, so the final candidate lists are not an artifact of a single fragile threshold value. The sweep does not, however, replace a permutation-based null distribution; it remains an internal-consistency check on how the accepted set changes with the threshold.
+The plateau provides a post-hoc anchor for $\tau$: the reported thresholds (0.2 human, 0.05 mouse), first chosen for a manageable candidate count, sit within or adjacent to stable regions, so the final candidate lists are not an artifact of a single fragile threshold value. The sweep does not, however, replace a permutation-based null distribution; it remains an internal-consistency check on how the accepted set changes with the threshold.
+
+Figure~\ref{fig:tau-sweep-zoom} isolates the region around the published human threshold. Within $0.15 \le \tau \le 0.2$ the event count descends monotonically---60 at $\tau = 0.15$ to 21 at $\tau = 0.2$---a smooth slope with no local plateau. The published $\tau = 0.2$ therefore does not rest on a stable ledge of its own; its robustness comes from the highland just above it (Section~\ref{sec:tau-sweep}), which holds ten robust-core events flat across $\tau = 0.25$ to $0.26$.
+
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=0.8\textwidth]{arrigoni_tau_sweep_zoom.png}
+    \caption{Zoomed tau sensitivity sweep for the human dataset over $0.15 \le \tau \le 0.2$. The event count descends monotonically from 60 to 21 with no local plateau; the published threshold $\tau = 0.2$ (dashed) sits at the foot of the slope, just below the stable highland at $\tau = 0.25$.}
+    \label{fig:tau-sweep-zoom}
+\end{figure}
 
 \section{Discussion}\label{sec:discussion}
 
@@ -125,6 +134,26 @@ These findings are now set within their broader methodological and biological co
 \subsection*{Key Findings Interpretation}
 
 Two conclusions follow from these results. The top candidates (Meg3, Malat1, TPM1) align with documented biology---lncRNA switching in neurogenesis and ribosomal protein regulation---which indicates that the algorithm recovers genuine signal rather than technical artifacts. Convergence across a human cell line mixture and mouse brain tissue further indicates that the method holds under different biological contexts rather than a single favourable case study.
+
+\subsection*{Literature Validation of the DTU Calls}\label{sec:dtu-validation}
+
+To gauge how much of the discovery is independently supported, the nine human and eight mouse candidate genes were checked against the published literature. Table~\ref{tab:dtu-validation} grades each call into three tiers: genes with strong, directly documented isoform-switch evidence; genes that are plausible but not directly confirmed; and genes that must be treated with caution.
+
+\begin{table}[htbp]
+    \centering
+    \begin{tabular}{llll}
+        \toprule
+        Dataset & Strong evidence & Plausible, unconfirmed & Treat with caution \\
+        \midrule
+        Human / NSCLC lines & TPM1, RPS24, SAT1 & DSTN, TPM4, SNHG5 & RPL10, RPL35A, RPS8 \\
+        Mouse / cortex & Meg3, Malat1, Srrm2, Lrrc7, Grin2b & Pde10a, Snrnp70 & Ttc14, Zfp941 \\
+        \bottomrule
+    \end{tabular}
+    \caption{Literature support for the DTU candidate genes. Strong-evidence genes are directly documented in prior isoform studies; plausible genes are consistent with related biology but not directly confirmed; caution genes lack prior DTU literature and need orthogonal validation.}
+    \label{tab:dtu-validation}
+\end{table}
+
+The first column is strongly plausible from the literature and anchors the method in established biology. The caution column, by contrast, carries no prior DTU evidence: confirming these calls would require an orthogonal experiment such as quantitative PCR, or re-running the analysis on a similar independent dataset to see whether the same isoform switches recur.
 
 \subsection*{Limitations and Caveats}
 
@@ -149,7 +178,7 @@ The framework established here opens several avenues for methodological extensio
 
 This hybrid approach could validate computational predictions while scaling to population-level sample sizes.
 
-    \item \textbf{Trajectory-aware analysis}: Current clustering assumes discrete cell populations, but differentiation is continuous. Modeling isoform proportions along pseudotime\defn{Pseudotime}{A one-dimensional ordering of cells along a continuous developmental or differentiation trajectory, capturing gradual transitions rather than discrete populations.} trajectories (e.g., using COTAN's framework adapted for regression rather than categorical comparison) could reveal dynamic switching patterns during transitions.
+    \item \textbf{Trajectory-aware analysis}: Current clustering assumes discrete cell populations, but differentiation is continuous. Modeling isoform proportions along pseudotime\defn{Pseudotime}{A one-dimensional ordering of cells along a continuous developmental or differentiation trajectory, capturing gradual transitions rather than discrete populations.} trajectories (e.g., using COTAN's framework adapted for regression rather than categorical comparison) could reveal dynamic switching patterns during transitions. Such an extension requires datasets suited to trajectory inference; the Ding samples were not, as the original paper states \cite{ding2020systematic}.
 
     \item \textbf{Allele-specific expression extension}: COTAN's contingency table approach naturally extends to phased variants. Detecting allele-biased isoform usage would connect regulatory genetics (eQTLs, sQTLs)\defn{eQTL / sQTL}{Genomic variants that measurably affect gene expression (eQTL) or splicing/isoform usage (sQTL); linking them to single-cell isoform switches connects population genetics with regulation.} to splicing outcomes in single cells---bridging population genomics with transcript regulation.
 
