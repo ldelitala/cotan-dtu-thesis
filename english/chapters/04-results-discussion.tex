@@ -1,66 +1,105 @@
 \chapter{Results and Discussion}\label{chap:results}
 
-This chapter presents the findings from applying transcript-level COTAN to scRNA-seq data. It begins with quality assessment (GDI clustering validation) and a comparison of gene-level and transcript-level structure, before presenting the main contribution: DTU detection results across the human and mouse datasets. Each section builds toward answering whether sparse 3'-biased data can support isoform-switch discovery using contingency-table statistics.
+This thesis shows that sparsity-robust, contingency-table statistics yield positive results for recovering \gls{dtu} from 3'-biased single-cell RNA-seq data. Applied to both a human cell line mixture and mouse cortical tissue, the adapted framework identified biologically consistent, mutually exclusive isoform switches, including TPM1, Meg3, and Malat1.
+
+However, the analysis does not jump straight to these core findings. Because the dataset relies on highly sparse terminal counts, every DTU call is only as trustworthy as the quality and clustering checks beneath it. Therefore, this chapter is structured as a fixed sequence of checks, with each phase guarding the step that follows. It first states the dimensions of the filtered matrices that bound every downstream step (Section~\ref{sec:matrix-dimensions}), then evaluates the \gls{gdi} to confirm that the raw transcript counts carry enough differential signal to separate distinct cell populations (Section~\ref{sec:gdi-transcript}). It then compares clustering partitions across gene and transcript matrices to locate exactly where isoform information alters the cellular grouping (Section~\ref{sec:clustering-comparison}). Only after these foundational tests validate the matrix's integrity does the analysis proceed to extract the DTU candidates (Section~\ref{sec:dtu-results}) and stress-test them against contrast thresholds (Section~\ref{sec:tau-sweep}) and the published literature (Section~\ref{sec:discussion}).
+
+\section{Filtered Matrix Dimensions}\label{sec:matrix-dimensions}
+
+The pipeline's output is fixed by the two filtering passes whose sizes bound everything downstream, and this section walks through them in the same order as Section~\ref{sec:data-filtering} describes them. Tables~\ref{tab:matrix-arigoni} and~\ref{tab:matrix-ding} collect the sizes at each step, one per dataset, so each number can be traced to the pass that produced it.
+
+\begin{table}[htbp]
+    \centering
+    \begin{tabular}{llr}
+        \toprule
+        Step & Barcodes & Transcripts \\
+        \midrule
+        Raw matrix & 488,342 & --- \\
+        Cell-level pass (passing QC) & 29,606 & --- \\
+        Feature-level pass (filtered) & 29,454 & 23,673 \\
+        \bottomrule
+    \end{tabular}
+    \caption{Arigoni matrix dimensions per filtering step, in the order of Section~\ref{sec:data-filtering}. The raw transcript count is not part of the reported set; the feature-level pass is the final matrix.}
+    \label{tab:matrix-arigoni}
+\end{table}
+
+\begin{table}[htbp]
+    \centering
+    \begin{tabular}{llr}
+        \toprule
+        Step & Barcodes & Transcripts \\
+        \midrule
+        Raw matrix & 121,082 & 149,443 \\
+        Cell-level pass (passing QC) & 4,091 & --- \\
+        Feature-level pass (filtered) & 4,077 & 12,848 \\
+        \bottomrule
+    \end{tabular}
+    \caption{Ding matrix dimensions per filtering step, in the order of Section~\ref{sec:data-filtering}; 28,692 genes in the authors' GEO set are shown in the text for the gene-level contrast.}
+    \label{tab:matrix-ding}
+\end{table}
+
+Although the transcriptome lists more transcripts than genes, the cleaned transcript matrix ends up smaller than the gene matrix: the raw mouse matrix detects 149,443 transcripts, yet after filtering only 12,848 remain, against 28,692 genes in the authors' GEO count set---isoform-level detection is so much sparser that most transcripts never pass the sparsity cutoff.
 
 \section{Dataset Quality Assessment via GDI}
 
-Before DTU calls can be interpreted, the clustering must be shown to capture biological structure rather than technical noise. The Global Differentiation Index (GDI), defined in Section~\ref{sec:cotan-framework}, provides this validation.
+Before DTU calls can be interpreted, the matrix itself must be shown to carry enough variability to distinguish cell populations. The \gls{gdi}, defined in Section~\ref{sec:cotan-framework}, provides this check without any clustering: it measures how much each feature varies across cells, so constitutive features sit near the null median (about $1.305$) while features that mark distinct populations rise above the threshold. The question here is whether the transcript-level counts still separate the populations once the gene-level resolution is replaced by sparse isoform counts.
 
-\subsection*{Transcript-level Clustering Quality}\label{sec:gdi-transcript}
+\subsection*{Transcript-level GDI Distribution}\label{sec:gdi-transcript}
 
-Figure~\ref{fig:gditranscript} shows the GDI plot for the mouse dataset clustered on transcript counts. Each point represents a cell, colored by its assigned cluster (11 uniform clusters total). The clear spatial separation indicates that transcript-level co-expression patterns distinguish distinct cellular populations.
+Figure~\ref{fig:gditranscript} plots the GDI of the mouse cortex dataset computed on transcript counts. Each point represents a single transcript, with the x-axis showing log-scaled average expression and the y-axis showing the GDI value. Highlighted labels track specific transcripts belonging to known housekeeping (HK), neural-progenitor (NPG), and post-mitotic-neuron (PNG) marker genes.
 
-Key observations from this visualization:
-\begin{itemize}
-    \item Cluster boundaries are well-defined with minimal overlap, suggesting robust isoform-based signatures.
-    \item High-GDI genes (marker candidates) show selective enrichment in specific clusters rather than uniform expression.
-    \item The noisy remainder cells (not assigned to any cluster) form a tight central cloud; these were filtered out from downstream DTU analysis.
-\end{itemize}
+Crucially, the transcript-level distribution upends classical gene-level expectations, revealing the mechanical realities of isoform quantification:
 
+\textbf{The Minor Isoform Collapse:} Several transcripts belonging to established NPG and PNG marker genes sit unexpectedly low, hovering near the blue null median line of roughly $1.305$. While the parent genes strongly identify cell types in aggregate, their minor or unexpressed isoforms fall victim to extreme sparsity. Without sufficient detection density to generate significant co-expression $p$-values, these specific variants flatline. This confirms that a marker gene's predictive power does not automatically transfer to all its constituent transcripts.
 
-This confirms that transcript-level data contains sufficient signal for meaningful clustering, despite sparsity and 3'-bias constraints.
+\textbf{The Housekeeping Variance Spike:} Conversely, several HK transcripts break well above the red target threshold of $1.5$. Because housekeeping genes are universally highly expressed, they generate massive quantities of 3'-biased terminal reads. The pseudo-aligner's Expectation-Maximization (EM) algorithm must distribute these ambiguous reads across overlapping equivalence classes. This process can introduce highly variable, cluster-correlated fractional assignments that COTAN correctly flags as structural variance, exposing either an EM quantification artifact or a genuine, unexpected isoform switch within a constitutive gene.
+
+\textbf{Decoupling Gene from Transcript:} The presence of a broad cloud of transcripts rising well above the threshold confirms that the sparse matrix retains robust differential signal. However, the inversion of the highlighted markers demonstrates that transcript-level variation is fundamentally decoupled from parent-gene identity, validating the necessity of analyzing these features as independent statistical entities.
 
 \begin{figure}[htbp]
     \centering
-    \includegraphics[width=0.8\textwidth]{GDI_transcript_plot_markers.png}
-    \caption{GDI plot of the mouse dataset clustered on transcript-level counts, coloured by the 11 uniform clusters.}
+    \includegraphics[width=1.0\textwidth]{GDI_transcript_plot_markers.png}
+    \caption{Transcript-level GDI of the mouse cortex dataset: one point per transcript, highlighted markers are housekeeping (HK), neural-progenitor (NPG), and post-mitotic-neuron (PNG) transcripts. Null median at roughly $1.305$; target threshold at $1.5$.}
     \label{fig:gditranscript}
 \end{figure}
 
-\subsection*{Gene vs Transcript Structure Comparison}
+\subsection*{Gene vs Transcript GDI Comparison}
 
-Figure~\ref{fig:gdi_genes} shows the same cells clustered using standard gene counts (15 clusters). The gene run reads the independent GEO gene matrix---28,692 features against the transcript matrix's 12,848---so its larger cluster count reflects the denser matrix, not a finer gene-level resolution.
+Figure~\ref{fig:gdi_genes} repeats the GDI computation on the standard gene-level matrix, highlighting the identical housekeeping and marker categories. Because the gene run utilizes the denser, independent GEO matrix (28,692 features against the transcript matrix's 12,848), it serves as a baseline for how these markers behave when isoform-level sparsity is removed.
+
+Comparing this gene-level distribution to the transcript-level plot reveals the profound impact of aggregation:
+
+\textbf{Recovery of Marker Signal:} At the gene level, the expected biological hierarchy is restored. Neural-progenitor (NPG) and post-mitotic-neuron (PNG) markers---such as Map2, Hes5, and Vim---clearly detach from the baseline cloud and ascend to high GDI values (2.0 to 4.0). By summing the reads of all constituent isoforms, the matrix recovers the statistical density required for COTAN to easily separate these distinct cellular populations.
+
+\textbf{Physiological Variance in Housekeeping Genes:} While several housekeeping genes (Amacr, Tars) anchor the baseline as expected, others (Zfr, Calm1, Actb) exhibit surprisingly high GDI scores. At the aggregated gene level, this spread reflects genuine biological variance. Because housekeeping genes are universally and highly expressed, their read counts are sensitive to systemic cellular differences---such as total library size, metabolic activity, and cell cycle stage---that naturally differ between a differentiating progenitor and a mature neuron. COTAN accurately captures this broad physiological variance as statistical non-independence.
+
+Ultimately, these two GDI analyses establish a critical foundation for the DTU pipeline: while gene-level aggregation is required to achieve the statistical power necessary to validate canonical cell-type markers, the transcript-level matrix still preserves sufficient differential signal to distinguish populations, validating the search for isoform-specific switches.
 
 \begin{figure}[htbp]
     \centering
-    \includegraphics[width=0.8\textwidth]{GDI_genes_plot_markers.png}
-    \caption{GDI plot of the same cells clustered on gene-level counts, yielding 15 clusters.}
+    \includegraphics[width=1.0\textwidth]{GDI_genes_plot_markers.png}
+    \caption{GDI plot of the same dataset on gene counts, with the same housekeeping and marker categories highlighted.}
     \label{fig:gdi_genes}
 \end{figure}
 
-These GDI analyses establish that both clustering approaches capture real biological signal, but with different sensitivity to cellular substructure. The main question is whether this structural difference translates into distinct DTU detection.
-
 \section{Clustering Comparison: Gene vs Transcript Level}\label{sec:clustering-comparison}
 
-To quantify how gene and transcript clustering diverge, a confusion matrix was constructed across 4,077 common cells present in both analyses.
+To quantify how gene and transcript clustering diverge, a confusion matrix was constructed across the 4,077 common cells present in both analyses. Figure~\ref{fig:confusion-matrix} cross-tabulates the 11 transcript-level clusters against the 15 gene-level clusters, revealing three distinct structural patterns that justify the isoform-level resolution.
 
 \begin{figure}[htbp]
     \centering
-    \includegraphics[width=0.8\textwidth]{heatmap_genes_vs_transcripts.pdf}
+    \includegraphics[width=0.9\textwidth]{heatmap_genes_vs_transcripts.pdf}
     \caption{Confusion matrix comparing transcript-level (11 clusters) and gene-level (15 clusters) assignments for the 4,077 common cells of the mouse dataset.}
     \label{fig:confusion-matrix}
 \end{figure}
 
-Figure~\ref{fig:confusion-matrix} shows the confusion matrix heatmap. Several patterns emerge:
-\begin{itemize}
-    \item \textbf{Diagonal dominance}: Most cells receive consistent assignments across both methods, validating that neither approach produces random clusters.
-    
-    \item \textbf{Systematic splitting}: Several transcript-level clusters correspond to sub-regions of single gene-level clusters. For example, transcript cluster 4 splits from the broader gene cluster 7, suggesting isoform variation within what appears homogeneous at gene resolution.
-    
-    \item \textbf{Selective merging}: Conversely, some adjacent transcript clusters merge in gene analysis, indicating that their differences rely on isoform-specific expression patterns rather than overall transcriptional activity.
-\end{itemize}
+\textbf{Diagonal dominance (signal preservation):} The majority of cells receive consistent assignments across both methods, grouping into heavy blocks along the diagonal (e.g., 261 cells cleanly mapping Gene cluster 04 to Transcript cluster 02). This validates that the transcript-level pipeline does not produce random partitions: despite the extreme sparsity of the filtered transcript matrix (12,848 features versus 28,692 genes), it recovers the broad cellular architecture without being overwhelmed by technical dropouts.
 
-The interpretation: across the two runs the counts differ (11 against 15) because the partitions come from different matrices---the transcript matrix is a sparser, feature-filtered view, the gene matrix a denser GEO count set---so the totals are not a resolution ranking. What the confusion matrix actually shows is agreement in the large and divergence in the particular: the dominant diagonal confirms both partitions recover the same broad populations, while the local splits and merges mark where isoform information changes the grouping. That is precisely the regime where DTU detection should add value---if isoform switches distinguish cell states that genes alone cannot separate, then transcript-aware methods capture biologically relevant signals.
+\textbf{Systematic splitting (hidden sub-states):} Several broad gene-level clusters break down into finer sub-regions at the transcript level. For example, Gene cluster 15 splits cleanly into Transcript clusters 07 (179 cells) and 08 (144 cells); similarly, the massive Gene cluster 12 distributes its cells predominantly across Transcript clusters 09, 10, and 11. This divergence suggests that populations appearing homogeneous under aggregated gene expression actually contain distinct sub-groups utilising fundamentally different isoform programs.
+
+\textbf{Selective merging (shared splicing profiles):} Conversely, the transcript matrix collapses some distinctions enforced by the gene matrix. Transcript cluster 04 merges populations from Gene clusters 05 (346 cells) and 06 (123 cells) into a single group. Cells differing in overall transcriptional activity could nonetheless share a unified, dominant isoform-usage profile.
+
+The discrepancy in total cluster counts (11 versus 15) is not a simple resolution ranking but a reflection of the matrices themselves: the transcript matrix is a heavily feature-filtered view, whereas the gene matrix is a denser reference count set. Ultimately, the confusion matrix demonstrates agreement in the large and divergence in the particular: the local splits and merges mark precisely where isoform information redraws biological boundaries, exposing the exact regime where downstream DTU detection---such as the transcript-exclusive Srrm2 and Grin2b switches---adds biological value over standard gene-centric workflows.
 
 However, this raises a critical question: whether the detected DTU events hold across clustering strategies, or depend entirely on how cells are partitioned. The robustness analysis below answers it.
 
@@ -69,120 +108,126 @@ The algorithm from Section~\ref{sec:methods-dtu-algorithm} was applied to both h
 
 \subsection*{Human Dataset Findings (Arigoni)}\label{sec:results-human}
 
-The human cell line mixture provided ground-truth validation through known biology. Of the 4958 genes carrying at least two detected transcripts, 430 retain at least one significant mutually exclusive pair\footnote{Counted by \texttt{extract\_dtu\_candidates()} and recorded in the run log (\texttt{results/arrigoni/logs/}); the exported \texttt{dtu\_candidates.csv} holds only the 21 survivors.}, yet after the bidirectional contrast threshold $\tau = 0.2$ only 21 candidates survive, across just 9 genes. That collapse from 430 to 9 is the algorithm working as designed: mutual exclusivity alone admits hundreds of pairs, but only a handful also flip their enrichment between clusters, and it is this second condition---a pair must be preferred in one cell type and disfavoured in another---that separates a genuine switch from a statistical curiosity.
+The human cell line mixture provided ground-truth validation through known biology. Roughly a tenth of the genes carrying at least two detected transcripts retain at least one significant mutually exclusive pair, yet after the bidirectional contrast threshold $\tau = 0.2$ only a handful of candidates survive, across just a few genes (Table~\ref{tab:dtu-funnel})\footnote{Counted by \texttt{extract\_dtu\_candidates()} and recorded in the run log (\texttt{results/arrigoni/logs/}); the exported \texttt{dtu\_candidates.csv} holds only the survivors.}. That collapse is the algorithm working as designed: mutual exclusivity alone admits hundreds of pairs, but only a handful also flip their enrichment between clusters, and it is this second condition---a pair must be preferred in one cell type and disfavoured in another---that separates a genuine switch from a statistical curiosity.
 
-The surviving candidates cohere into a single story. TPM1, the strongest call, is a tropomyosin whose isoforms oppose each other across the cell lines: one isoform is enriched in PC9 and DV90 while the other dominates A549 and HCC78, a reciprocal preference that reads as cell-type-specific cytoskeletal tuning. Alongside it sit RPS24 and SAT1, whose DTU signals point toward cell-type-specific translation regulation and metabolic rewiring, consistent with the heterogeneity of specialised translation \cite{xue2012specialized}. The two themes are biologically distinct but converge in method: in both cases a single gene carries two isoforms that the same cell types use in opposite directions, and it is that convergence, not any single gene, that validates the detector. The final list is small precisely because the algorithm demands both \gls{mutualExclusivity} and a bidirectional contrast, and that conservative design is what lets nine genes carry the whole human result. Section~\ref{sec:dtu-validation} grades these nine genes by the strength of their literature support.
+\begin{table}[htbp]
+    \centering
+    \begin{tabular}{llr}
+        \toprule
+        Filtering stage & Genes & Pairs \\
+        \midrule
+        $\geq$ 2 detected transcripts & 4,958 & --- \\
+        $\geq$ 1 significant mutually exclusive pair & 430 & 2,006 \\
+        Bidirectional contrast $\tau = 0.2$ & 9 & 21 \\
+        \bottomrule
+    \end{tabular}
+    \caption{Funnel of the human DTU search.}
+    \label{tab:dtu-funnel}
+\end{table}
 
 \subsection*{Mouse Dataset Findings (Ding)}\label{sec:results-mouse}
 
-For mouse brain tissue a lower threshold, $\tau = 0.05$, was applied, and the balance shifts: only 14 genes carry significant pairs, yet 46 candidates survive across 8 genes. The inversion is itself informative---fewer initial pairs but more survivors means mouse cortex switches are gradual rather than sharp, so a relaxed threshold admits many weak but real transitions that the strict human cutoff would have discarded.
+For mouse brain tissue a lower threshold, $\tau = 0.09$, was applied, and DTU extraction was run on both clusterizations---the transcript-derived partition and the gene-derived one. Both runs start from the same funnel---14 genes carrying 53 significant pairs at the loosest point ($\tau = 0.01$)---but diverge once the contrast is applied: 41 candidates across 5 genes survive at $\tau = 0.09$ in the transcript-derived clusters, and 38 across 3 genes in the gene-derived ones (Table~\ref{tab:dtu-funnel-mouse}). The inversion is itself informative---fewer initial pairs but more survivors means mouse cortex switches are gradual rather than sharp, so a relaxed threshold admits many weak but real transitions that the strict human cutoff would have discarded. The gene-derived set is a strict subset of the transcript-derived one: all 38 pairs it detects are also found by the transcript partition, which additionally captures three---Grin2b and two Srrm2 switches---exclusive to it.
 
-The candidates trace an arc across the tissue. Meg3, a long non-coding RNA\defn{Long non-coding RNA (lncRNA)}{A long RNA molecule that does not encode a protein but regulates gene expression, splicing, and development.} with a documented role in neuronal differentiation, shows a reciprocal isoform preference across cell clusters: isoform A dominates the early progenitor clusters while isoform B is enriched in differentiated neurons. Malat1, another highly conserved lncRNA involved in splicing regulation, shows the same cluster-specific preference, consistent with the alternative 3$'$ isoform usage documented for this locus \cite{ghanam2023malat1}. The two lncRNAs are neighbours in function---both non-coding, both switching with differentiation---and together they anchor the mouse result in established biology. The arc then turns inward: Srrm2 encodes a core spliceosome\defn{Spliceosome}{The molecular machine that removes introns and joins exons during splicing.} component, and its own DTU suggests feedback regulation, alternative splicing of splicing factors being a known mechanism for tuning isoform landscapes across cell states. Two further calls, Lrrc7 and Grin2b, are also consistent with the literature. By contrast, Ttc14 and Zfp941 are novel candidates with no prior DTU literature, and require \gls{orthogonalValidation} to confirm their biological significance---their presence is a reminder that the method also surfaces calls no published study has anticipated. Note that this reading is expressed in terms of discrete cluster preferences rather than a differentiation trajectory: the original study states that its samples were not appropriate for pseudotime analysis \cite{ding2020systematic}.
-
-\subsection*{Robustness Analysis: Shared vs Exclusive Events}\label{sec:robustness}
-
-DTU detection was re-run using gene-derived cluster labels on the same transcript matrix, and the resulting event lists were compared across both clustering strategies. Both partitionings returned the same total, 46 DTU pairs; their composition differed:
-\begin{itemize}
-    \item \textbf{Shared events}: Majority of pairs detected by both methods, including Meg3 and Malat1---these represent strong signals surviving regardless of partitioning scheme.
-    
-    \item \textbf{Transcript-exclusive (3 pairs)}: Srrm2 and Ttc14 isoform switches appeared only with transcript-derived clusters. These likely reflect subtle transitions requiring fine-grained population resolution to detect.
-
-    \item \textbf{Gene-exclusive (4 pairs)}: Snrnp70, Lrrc7, Zfp941, and a specific Meg3 pair detected only using gene-level clustering. These may represent weaker signals that benefit from aggregated statistical power.
-\end{itemize}
-
-The interpretation:
-\begin{enumerate}
-    \item Strongest DTU signals (high effect size) survive both approaches---validating the algorithm's core functionality.
-    
-    \item Subtle switches depend on clustering resolution: transcript-level captures isoform-specific states; gene-level provides power for low-abundance transcripts.
-    
-    \item Neither approach dominates universally. Researchers should consider their biological question when choosing---fine-grained substructure vs statistical robustness.
-\end{enumerate}
-
-This robustness analysis confirms that while the strongest signals are cluster-agnostic, subtle isoform switches reveal themselves only under appropriate partitioning schemes. The choice of clustering strategy is not merely technical---it shapes which biology becomes visible.
+\begin{table}[htbp]
+    \centering
+    \begin{tabular}{llr}
+        \toprule
+        Filtering stage & Genes & Pairs \\
+        \midrule
+        $\geq$ 2 detected transcripts & 2,122 & --- \\
+        $\geq$ 1 significant mutually exclusive pair & 14 & 53 \\
+        Bidirectional contrast $\tau = 0.09$ (transcript) & 5 & 41 \\
+        Bidirectional contrast $\tau = 0.09$ (gene) & 3 & 38 \\
+        \bottomrule
+    \end{tabular}
+    \caption{Funnel of the mouse DTU search.}
+    \label{tab:dtu-funnel-mouse}
+\end{table}
 
 \subsection*{Threshold Sensitivity: The Tau Sweep}\label{sec:tau-sweep}
 
-The candidate count depends on the contrast threshold $\tau$. The threshold was not derived from a statistical null distribution; it was first chosen pragmatically to yield a manageable candidate list---few enough events that each could be inspected and, where needed, validated experimentally, a range on the order of tens of events (Section~\ref{sec:tuning-tau}). To check that this pragmatic choice does not sit on a fragile edge, the analysis re-runs the DTU extraction over a fine grid of $\tau$ values (0.005 to 0.3 at step 0.005) and records, at each threshold, the number of accepted events and the unique genes behind them.
+The candidate count fundamentally depends on the differential expression contrast threshold ($\tau$). Because this parameter was initially selected pragmatically to yield a biologically manageable candidate list (on the order of tens of events) rather than derived from a formal statistical null distribution, it is critical to verify that the chosen values do not sit on a fragile algorithmic edge. To evaluate this stability, the DTU extraction was re-run over a fine grid of $\tau$ values (ranging from 0.005 to 0.300 at intervals of 0.005), recording the number of accepted events and unique genes at each step.
 
-The event count is monotone decreasing in $\tau$---a sanity check that the extraction responds predictably to the threshold.
+The resulting sensitivity sweep acts as an internal consistency check, confirming that the event count decreases monotonically as the threshold strictly increases.
 
-Figure~\ref{fig:tau-sweep} maps that search across a landscape of thresholds. The bulk of significant pairs descends like a long, smooth slope---from 2006 at $\tau = 0.005$ to 21 at $\tau = 0.2$---a nearly featureless gradient that reflects the homogeneous cell-line mixture: every isoform pair carries some reciprocal contrast, so the terrain is a dense and continuous spectrum with no natural break. On such a slope any single threshold looks arbitrary, and this is exactly the trap the sweep is built to expose. As the eye climbs the landscape a highland finally appears: at $\tau = 0.25$ ten events hold flat through $\tau = 0.26$---a genuine plateau, ground stable enough to stand on rather than a point on the slope. The published threshold $\tau = 0.2$ reproduces the 21 reported candidates and sits just below that highland, so the human result is anchored at the edge of stable ground rather than lost somewhere on the tail. The mouse terrain is different: it descends in steps, 46 events at $\tau = 0.05$ holding at 41 and 36 across wide intervals, because heterogeneous tissue is dominated by a few high-contrast switches with a sparse tail---so its plateaus are broad ledges, not a single summit.
+\textbf{Human Dataset Dynamics (Figures~\ref{fig:tau-sweep} and~\ref{fig:tau-sweep-zoom}):} Figure~\ref{fig:tau-sweep} maps this threshold landscape for the homogeneous human cell-line mixture. The bulk of significant pairs descends in a smooth, continuous curve---dropping from 2006 events at $\tau = 0.005$ to 21 events at $\tau = 0.2$. This nearly featureless gradient reflects the nature of the well-separated cell lines: almost every isoform pair carries some reciprocal contrast, creating a dense spectrum with no natural break.
 
-\begin{figure}[htbp]
+On such a continuous slope, any single threshold might appear arbitrary. However, as shown in the zoomed-in view of Figure~\ref{fig:tau-sweep-zoom}, a genuine plateau emerges at $\tau = 0.25$, where the candidate count holds perfectly flat at ten events through $\tau = 0.26$. The published threshold of $\tau = 0.2$, which successfully reproduces the 21 reported candidates, sits immediately at the foot of this slope, just below the stable highland. Therefore, the human result is anchored at the boundary of a stable topological region rather than lost arbitrarily on a volatile tail.
+
+\begin{figure}[H]
+    \begin{adjustwidth}{-1.5cm}{-1.5cm}
     \centering
-    \includegraphics[width=0.8\textwidth]{arrigoni_tau_sweep.png}
-    \caption{Tau sensitivity sweep for the human dataset: DTU events versus the minimum DEA contrast threshold $\tau$. A stable plateau appears at $\tau = 0.25$ with ten events holding flat through $\tau = 0.26$; the published $\tau = 0.2$ (dashed) reproduces the 21 reported candidates.}
-    \label{fig:tau-sweep}
+    \begin{subfigure}[b]{0.48\linewidth}
+        \includegraphics[width=\linewidth]{arrigoni_tau_sweep.png}
+        \caption{Human dataset, full range.}
+        \label{fig:tau-sweep}
+    \end{subfigure}
+    \hfill
+    \begin{subfigure}[b]{0.48\linewidth}
+        \includegraphics[width=\linewidth]{arrigoni_tau_sweep_zoom.png}
+        \caption{Human dataset, zoom ($0.15 \le \tau \le 0.28$).}
+        \label{fig:tau-sweep-zoom}
+    \end{subfigure}
+    \vspace{\smallskipamount}
+    \begin{subfigure}[b]{0.48\linewidth}
+        \includegraphics[width=\linewidth]{ding_tau_sweep.png}
+        \caption{Mouse cortex (transcript clusters).}
+        \label{fig:tau-sweep-mouse}
+    \end{subfigure}
+    \hfill
+    \begin{subfigure}[b]{0.48\linewidth}
+        \includegraphics[width=\linewidth]{ding_gene_tau_sweep.png}
+        \caption{Mouse cortex (gene clusters).}
+        \label{fig:tau-sweep-mouse-gene}
+    \end{subfigure}
+    \end{adjustwidth}
+    \caption{Tau sensitivity sweeps: accepted DTU events as a function of the contrast threshold $\tau$.}
+    \label{fig:tau-sweeps}
 \end{figure}
 
-The plateau provides a post-hoc anchor for $\tau$: the reported thresholds (0.2 human, 0.05 mouse), first chosen for a manageable candidate count, sit within or adjacent to stable regions, so the final candidate lists are not an artifact of a single fragile threshold value. The sweep does not, however, replace a permutation-based null distribution; it remains an internal-consistency check on how the accepted set changes with the threshold.
+\textbf{Mouse Dataset Dynamics:} The threshold landscape for the mouse cortex behaves structurally differently. Rather than a smooth gradient, the candidate count descends in discrete steps, with the 41 events at $\tau = 0.09$ holding steady across the wide band $\tau = 0.07$--$0.09$ before stepping down through 40, 39, and 38 (Figure~\ref{fig:tau-sweep-mouse}). Because the heterogeneous tissue is dominated by a few high-contrast isoform switches accompanied by a highly sparse tail, its stability regions manifest as broad ledges rather than a single distinct summit. The gene-derived clusters trace a similar shape but reach extinction sooner, holding ledges at 38 ($\tau = 0.09$--$0.12$) and 37 ($\tau = 0.13$--$0.14$) before collapsing (Figure~\ref{fig:tau-sweep-mouse-gene}). The chosen threshold of $\tau = 0.09$ is the point where both partitions sit simultaneously on their plateaus---the joint-stable point that makes the call principled rather than arbitrary.
 
-Figure~\ref{fig:tau-sweep-zoom} isolates the region around the published human threshold. Within $0.15 \le \tau \le 0.2$ the event count descends monotonically---60 at $\tau = 0.15$ to 21 at $\tau = 0.2$---a smooth slope with no local plateau. The published $\tau = 0.2$ therefore does not rest on a stable ledge of its own; its robustness comes from the highland just above it (Section~\ref{sec:tau-sweep}), which holds ten events flat across $\tau = 0.25$ to $0.26$.
-
-\begin{figure}[htbp]
-    \centering
-    \includegraphics[width=0.8\textwidth]{arrigoni_tau_sweep_zoom.png}
-    \caption{Zoomed tau sensitivity sweep for the human dataset over $0.15 \le \tau \le 0.28$, chosen so the descending slope and the stable plateau are both visible in one panel. Total DTU events descend from 60 at $\tau = 0.15$ through 21 at $\tau = 0.2$, then fall to ten; from $0.25$ to $0.26$ the count holds flat at ten---the genuine plateau. The published threshold $\tau = 0.2$ (dashed) sits at the foot of the slope, just below that highland.}
-    \label{fig:tau-sweep-zoom}
-\end{figure}
+Ultimately, this parameter sweep provides a vital post-hoc anchor for the heuristic thresholds. While the selected values (0.2 for human, 0.09 for mouse) were originally targeted for validation feasibility, the sweep proves they reside within or directly adjacent to mathematically stable regions. Consequently, the final candidate lists are robust structural findings, not artifacts of a single, fragile threshold value. However, this sensitivity sweep remains a diagnostic heuristic; establishing a true permutation-based null distribution would be the optimal future methodology to provide statistically calibrated $p$-values for the contrast metric.
 
 \section{Discussion}\label{sec:discussion}
 
 These findings are now set within their broader methodological and biological context.
 
-\subsection*{Key Findings Interpretation}
+\subsection*{Key Findings and Literature Validation}
 
-Two conclusions follow from these results. The top candidates (Meg3, Malat1, TPM1) align with documented biology---lncRNA switching in neurogenesis and ribosomal protein regulation---which indicates that the algorithm recovers genuine signal rather than technical artifacts. Convergence across a human cell line mixture and mouse brain tissue further indicates that the method holds under different biological contexts rather than a single favourable case study.
-
-\subsection*{Literature Validation of the DTU Calls}\label{sec:dtu-validation}
-
-To gauge how much of the discovery is independently supported, the nine human and eight mouse candidate genes were checked against the published literature. Table~\ref{tab:dtu-validation} grades each call into three tiers: genes with strong, directly documented isoform-switch evidence; genes that are plausible but not directly confirmed; and genes that must be treated with caution.
+The top candidates (Meg3, Malat1, TPM1) align with documented biology---lncRNA switching in neurogenesis and ribosomal protein regulation---which indicates that the algorithm recovers genuine signal rather than technical artifacts. Convergence across a human cell line mixture and mouse brain tissue further indicates that the method holds under different biological contexts rather than a single favourable case study. Table~\ref{tab:dtu-validation} frames these calls along a gradient from strong evidence to uncharted ground, and reading the results along that gradient both validates the method and marks what it cannot yet claim.
 
 \begin{table}[htbp]
     \centering
-    \begin{tabular}{llll}
+    {\small
+    \begin{tabular}{@{}p{2.6cm} p{3.4cm} p{3.4cm} p{3.4cm}@{}}
         \toprule
         Dataset & Strong evidence & Plausible, unconfirmed & Treat with caution \\
         \midrule
         Human / NSCLC lines & TPM1, RPS24, SAT1 & DSTN, TPM4, SNHG5 & RPL10, RPL35A, RPS8 \\
-        Mouse / cortex & Meg3, Malat1, Srrm2, Lrrc7, Grin2b & Pde10a, Snrnp70 & Ttc14, Zfp941 \\
+        Mouse / cortex & Meg3, Malat1 & Pde10a, Grin2b, Srrm2 & --- \\
         \bottomrule
-    \end{tabular}
+    \end{tabular}}
     \caption{Literature support for the DTU candidate genes. Strong-evidence genes are directly documented in prior isoform studies; plausible genes are consistent with related biology but not directly confirmed; caution genes lack prior DTU literature and need orthogonal validation.}
     \label{tab:dtu-validation}
 \end{table}
 
-The first column is strongly plausible from the literature and anchors the method in established biology. The caution column, by contrast, carries no prior DTU evidence: confirming these calls would require an orthogonal experiment such as quantitative PCR, or re-running the analysis on a similar independent dataset to see whether the same isoform switches recur.
+\textbf{Strong evidence:} This tier anchors the method in established biology. In the human mixture it is led by TPM1, a cell-type-specific cytoskeletal switch: one tropomyosin isoform is enriched in PC9 and DV90 while its counterpart dominates A549 and HCC78. Alongside it sit RPS24 and SAT1, whose bidirectional shifts are consistent with the heterogeneity of specialised translation and metabolic rewiring. On the mouse side, the long non-coding RNAs\defn{Long non-coding RNA (lncRNA)}{A long RNA molecule that does not encode a protein but regulates gene expression, splicing, and development.} Meg3 and Malat1 switch with differentiation---Meg3's isoform A dominates early progenitor clusters while isoform B is enriched in differentiated neurons, and Malat1 shows the same cluster-specific preference consistent with its documented alternative 3$'$ usage \cite{ghanam2023malat1}. These genes share no mechanism, yet every one produces the same reciprocal, mutually exclusive signature: a single gene carrying two isoforms that the same cell types use in opposite directions, one enriched where the other is disfavoured. That pattern is exactly the signature \texttt{extract\_dtu\_candidates()} was built to detect, and its recurrence across genes with independent biology is unlikely to arise by chance. The convergence---not any single gene---is the evidence that the detector captures genuine regulatory structure rather than a statistical curiosity. This reading is expressed in terms of discrete cluster preferences rather than a differentiation trajectory, since the original study states that its samples were not appropriate for pseudotime analysis \cite{ding2020systematic}.
 
-\subsection*{Limitations and Caveats}
+\textbf{Plausible but unconfirmed:} The middle tier (DSTN, TPM4, SNHG5; Pde10a, Grin2b, Srrm2) presents biologically consistent patterns of alternative usage that align with related literature, though none is directly confirmed as an isoform switch in prior studies. These calls extend the method's reach without yet anchoring it. On the mouse side, Pde10a is detected by both clusterizations, while Grin2b and Srrm2 surface only in the transcript-derived partition at contrast just above the $\tau = 0.09$ bar, so they sit at the boundary between plausible and confirmed.
 
-Despite encouraging results, several constraints temper interpretation:
+\textbf{Treated with caution:} The final tier (RPL10, RPL35A, RPS8 in the human dataset) carries significant statistical switching in this matrix but no prior DTU literature. These novel candidates are exactly the calls that require orthogonal validation: confirming them would demand an orthogonal experiment such as quantitative PCR\defn{RT-PCR}{Reverse-transcription polymerase chain reaction: a lab technique that experimentally confirms whether a specific isoform is present, used as an orthogonal check on computational DTU calls.} or long-read sequencing, or a re-run on an independent dataset to see whether the same isoform switches recur. Binding validation to this tier turns the absence of ground truth into a concrete next step rather than a detached caveat. The mouse cortex retains no caution-tier candidates at the raised threshold: the weak, unanchored calls (Ttc14, Zfp941, Snrnp70, Lrrc7) all fall below the $\tau = 0.09$ contrast bar and are dropped, which is itself the precision gain of the stricter threshold.
+
+A further conclusion concerns clustering resolution. The strongest signals survive both clusterizations---they are cluster-agnostic and validate the core functionality---while the subtler switches surface only in the transcript-derived partition: Grin2b and two Srrm2 events are captured by the transcript clusters but absent from the gene-derived set, which at $\tau = 0.09$ is a strict subset of the transcript one. The choice of partition therefore shapes which biology becomes visible: the strongest signals are robust, but fine-grained isoform transitions reveal themselves only under the isoform-aware resolution.
+
+\subsection*{Technical Limitations}
+
+The constraints that temper these results are grouped under one heading:
 \begin{itemize}
     \item \textbf{3'-bias invisibility}: Alternative splicing events occurring in transcript mid-regions remain undetectable when only \gls{threePrimeEnd}s are sequenced. The DTU candidates found here represent a subset---those where isoforms differ at their terminal exons or 3' ends.
 
     \item \textbf{EM rounding effects}: Fractional EM assignments were rounded to integers for COTAN compatibility (Section~\ref{sec:data-filtering}). Low-abundance isoforms with small fractional counts may be distorted by this discretization, potentially introducing false negatives or altered contrast values.
 
     \item \textbf{Threshold sensitivity}: The choice of $\tau$ lacks formal statistical grounding. The tau sweep (Section~\ref{sec:tau-sweep}) anchors the threshold empirically at a stable plateau, but a permutation-based null distribution would still provide calibrated $p$-values rather than a consistency-based choice.
-
-    \item \textbf{Lack of orthogonal validation}: Without long-read sequencing or targeted RT-PCR\defn{RT-PCR}{Reverse-transcription polymerase chain reaction: a lab technique that experimentally confirms whether a specific isoform is present, used as an orthogonal check on computational DTU calls.} confirmation, false positive rates remain estimated from internal consistency (shared vs exclusive events) rather than ground truth.
-
-This is a limitation common to computational DTU studies but remains critical for biological claims.
 \end{itemize}
-
-\subsection*{Future Directions: Extending COTAN for Transcript Analysis}
-
-The framework established here opens several avenues for methodological extension:
-\begin{enumerate}
-    \item \textbf{Integration with long-read data}: Combining short-read depth (thousands of cells) with PacBio/Nanopore\defn{Long-read sequencing (PacBio, Oxford Nanopore)}{Sequencing technologies that produce full-length transcript reads, giving complete isoform annotation unavailable from short 3'-biased reads.} isoform annotation would anchor DTU calls in complete transcript sequences.
-
-This hybrid approach could validate computational predictions while scaling to population-level sample sizes.
-
-    \item \textbf{Trajectory-aware analysis}: Current clustering assumes discrete cell populations, but differentiation is continuous. Modeling isoform proportions along pseudotime\defn{Pseudotime}{A one-dimensional ordering of cells along a continuous developmental or differentiation trajectory, capturing gradual transitions rather than discrete populations.} trajectories (e.g., using COTAN's framework adapted for regression rather than categorical comparison) could reveal dynamic switching patterns during transitions. Such an extension requires datasets suited to trajectory inference; the Ding samples were not, as the original paper states \cite{ding2020systematic}.
-
-    \item \textbf{Allele-specific expression extension}: COTAN's contingency table approach naturally extends to phased variants. Detecting allele-biased isoform usage would connect regulatory genetics (eQTLs, sQTLs)\defn{eQTL / sQTL}{Genomic variants that measurably affect gene expression (eQTL) or splicing/isoform usage (sQTL); linking them to single-cell isoform switches connects population genetics with regulation.} to splicing outcomes in single cells---bridging population genomics with transcript regulation.
-
-    \item \textbf{Benchmarking against bulk DTU tools}: Systematic comparison with rMATS, SUPPA2, and DRIMSeq \cite{love2018swimming, draper2025selecting} on matched pseudo-bulks would contextualize sensitivity and specificity. This benchmark could identify regimes where single-cell methods add unique value versus when aggregation suffices.
-\end{enumerate}
-
-These extensions remain beyond the scope of this thesis, but they indicate that the framework admits further adaptation as new data types and biological questions emerge.

@@ -1,10 +1,14 @@
 \chapter{Conclusions}
 
-This thesis established that COTAN's sparsity-robust contingency-table framework can be extended to transcript-level analysis, recovering within-gene exclusivity patterns indicative of Differential Transcript Usage (DTU) from sparse $3'$-biased single-cell \gls{rnaSeq} data.
+While $3'$-biased droplet protocols strip away the internal transcript structure usually required for isoform analysis, this thesis demonstrates that some \gls{dtu} can still be reliably detected. By extending COTAN's sparsity-robust contingency-table framework to the transcript level, this work successfully recovered within-gene exclusivity patterns directly from sparse, terminal read counts.
 
 \section{Summary of Findings}
 
-Applied to the two droplet datasets, the adapted framework returned detectable signal in both: 430 human genes carried a significant mutually exclusive isoform pair, 21 candidates surviving the bidirectional contrast filter, and 46 mouse candidates passed at the lower threshold. The strongest calls---TPM1 in the cell line mixture, Meg3 and Malat1 in the mouse cortex---are consistent with documented isoform biology \cite{ghanam2023malat1, xue2012specialized}, and most survived the swap of clustering strategy, so the signal does not depend on a particular partitioning scheme.
+Before extracting \gls{dtu} events, it was imperative to establish that the extreme sparsity inherent to $3'$-biased droplet data did not obscure the underlying biological signal. The analysis demonstrated that the transcript-level \gls{gdi} distribution successfully preserved enough differential variance to separate distinct cellular populations. Furthermore, transcript-level clustering recovered fine-grained cellular substructures that were entirely masked under standard gene-level aggregation partitions.
+
+Applied to the two distinct single-cell datasets, the adapted contingency-table framework successfully returned detectable signals in both. In the human cell line mixture, the algorithm initially identified 430 genes exhibiting mutually exclusive isoform usage; after enforcing a rigorous bidirectional contrast filter, 21 high-confidence candidates survived. Similarly, in the highly heterogeneous mouse cortical tissue, 41 candidate switches passed the established lower contrast threshold in the transcript-derived partition (38 in the gene-derived one).
+
+Crucially, the strongest DTU calls output by the pipeline---such as TPM1 in the human cell mixture, alongside Meg3 and Malat1 in the mouse cortex---are highly consistent with documented isoform biology \cite{ghanam2023malat1, xue2012specialized}. To ensure these findings were robust rather than methodological artifacts, the candidates were cross-validated against an alternative clustering strategy. The majority of the top isoform switches survived this swap, demonstrating that the detected structural mutual exclusivity represents a genuine regulatory signal that does not depend on any specific partitioning scheme.
 
 \section{Broader Implications}
 
@@ -20,21 +24,33 @@ This work has implications across three domains:
 
 Beyond the findings, this thesis leaves a set of reusable artefacts, published together in the public repository that accompanies it.
 
-\textbf{An analysis library.} The \texttt{cotanisoform} R package collects the whole analysis path into documented functions: reading a count matrix, adapting it to COTAN, running the COTAN steps, extracting DTU candidates, and comparing runs. It can be installed and used on any single-cell dataset, independently of the two datasets studied here, and its logging layer lets a long run report its own progress and failures in one consistent trace.
-
 \textbf{A quantification pipeline.} The Nextflow pipeline (Section~\ref{sec:pipeline}) automates the path from raw reads to a count matrix, offering both the gene-level and the transcript-level index. Its steps run separately, so a re-run from an existing index does not repeat the download.
+
+\textbf{An analysis library.} The \texttt{cotanisoform} R package collects the whole analysis path into documented functions: reading a count matrix, adapting it to COTAN, running the COTAN steps, extracting DTU candidates, and comparing runs. It can be installed and used on any single-cell dataset, independently of the two datasets studied here, and its logging layer lets a long run report its own progress and failures in one consistent trace.
 
 \textbf{A reproducible analysis layer.} The driver scripts reproduce the complete analysis of a dataset from a single configuration file, one per dataset and feature level, so each reported table can be regenerated without interactive input.
 
-\textbf{Documentation and reference outputs.} The repository documents the method, the parameters behind each published table, and a parity script that re-derives the reported DTU tables from the stored objects, so a reader can check the results rather than take them on trust.
+\textbf{Documentation and reference outputs.} The repository documents the method and the parameters behind each published table, and it stores the published results themselves---the DTU candidate tables, tau-sweep and \gls{gdi} plots, and the run logs---under \texttt{results/}, one directory per dataset.
 
 \section{Limitations and Future Work}
 
 The constraints on these results---$3'$-bias invisibility, the absence of orthogonal validation, the heuristic threshold $\tau$, and EM rounding---are set out together with the directions they open in Section~\ref{sec:discussion}. The same underlying trade-off governs all four: sensitivity is bought with cells rather than coverage, so the value of the method grows as datasets do.
 
+The framework established in this thesis opens several methodological extensions beyond the two datasets studied here:
+
+\textbf{Integration with long-read data:} Combining short-read depth (thousands of cells) with PacBio/Nanopore\defn{Long-read sequencing (PacBio, Oxford Nanopore)}{Sequencing technologies that produce full-length transcript reads, giving complete isoform annotation unavailable from short 3'-biased reads.} isoform annotation would anchor DTU calls in complete transcript sequences. This hybrid approach could validate computational predictions while scaling to population-level sample sizes.
+
+\textbf{Trajectory-aware analysis:} Current clustering assumes discrete cell populations, but differentiation is continuous. Modeling isoform proportions along pseudotime\defn{Pseudotime}{A one-dimensional ordering of cells along a continuous developmental or differentiation trajectory, capturing gradual transitions rather than discrete populations.} trajectories (e.g., using COTAN's framework adapted for regression rather than categorical comparison) could reveal dynamic switching patterns during transitions. Such an extension requires datasets suited to trajectory inference; the Ding samples were not, as the original paper states \cite{ding2020systematic}.
+
+\textbf{Allele-specific expression extension:} COTAN's contingency table approach naturally extends to phased variants. Detecting allele-biased isoform usage would connect regulatory genetics (eQTLs, sQTLs)\defn{eQTL / sQTL}{Genomic variants that measurably affect gene expression (eQTL) or splicing/isoform usage (sQTL); linking them to single-cell isoform switches connects population genetics with regulation.} to splicing outcomes in single cells---bridging population genomics with transcript regulation.
+
+\textbf{Benchmarking against bulk DTU tools:} Systematic comparison with rMATS, SUPPA2, and DRIMSeq \cite{love2018swimming, draper2025selecting} on matched pseudo-bulks would contextualize sensitivity and specificity. This benchmark could identify regimes where single-cell methods add unique value versus when aggregation suffices.
+
 On the computational side, the pipeline and the analysis remain two halves joined at the count matrix: the Nextflow workflow ends at the filtered matrix, and the R analysis is started separately. Folding the analysis into the workflow as one further step would let a single run cover the path from raw accessions to DTU candidates, which is the main engineering direction this work leaves open.
 
-A newer quantifier points the same way. SCALPEL\cite{ake2025scalpel} builds the transcript matrix from standard $3'$-based data by a different route from the EM step used here, and its authors report higher sensitivity and closer recovery of true isoform proportions than existing tools, with experimental validation. Substituting it for \texttt{parsimony-em} would test whether the downstream DTU calls sharpen, making it a natural extension of this framework.
+A newer quantifier points the same way, but at a coarser grain than the EM step used here. SCALPEL\cite{ake2025scalpel} is a complete Nextflow pipeline that would substitute the whole quantification half of this work, from raw reads to a transcript matrix. Where it diverges from this thesis is at quantification itself: instead of an identity transcript-to-gene index resolved by alevin-fry's EM, SCALPEL filters internal-priming artefacts out of the aligned reads and builds an APA-aware isoform-level matrix (Section~\ref{sec:pipeline}). Its authors report higher sensitivity and specificity than existing tools on synthetic data, and predictions that agree with other tools and survive experimental validation on real data \cite{ake2025scalpel}. In future work, its transcript matrix would be fed into COTAN exactly as the matrix built here is, testing whether the downstream DTU calls sharpen---the contingency-table analysis would stay unchanged, and SCALPEL would simply supply a sharper, APA-aware input. That COTAN output would in turn be compared against SCALPEL's own differential-isoform-usage table, providing an independent DTU caller as an orthogonal cross-check on the contingency-table calls.
+
+Bootstrapped quantification variance is a second extension. Abundance-based DTU tools recover the uncertainty of the EM point estimates by bootstrapping, but the contingency-table statistics used here operate on binary presence and absence, so the variance of those point estimates is of limited relevance to the reported calls. It still matters at the margin, where an estimate error near the detection threshold can flip a cell's detection state; recovering the variance by bootstrapping the quantification step would let a future analysis quantify that edge. It is left as future work rather than included here.
 
 \section*{Final Remarks}
 
