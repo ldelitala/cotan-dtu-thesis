@@ -1,9 +1,18 @@
-\documentclass[a4paper, 12pt, twoside,openright]{book}
+\documentclass[a4paper, 11pt, twoside,openright]{book}
 \usepackage[osf]{libertinus} %font generale del documento
 \pagestyle{plain} %nessun heading o foot particolare
+% Page number: smaller than text, centred at the bottom (dept guide: "la grandezza dei
+% caratteri usati per numerare le pagine ... deve essere inferiore a quella usata per il testo")
+\makeatletter
+\renewcommand\ps@plain{\let\@mkboth\@gobbletwo
+  \let\@oddhead\@empty\let\@evenhead\@empty
+  \def\@oddfoot{\hfil\small\thepage\hfil}\let\@evenfoot\@oddfoot}
+\makeatother
 % Body size set by \documentclass (12pt); footnotes set to 10pt below = standard convention
-\usepackage[a4paper,top=3cm,bottom=3cm,inner=3cm,outer=3cm]{geometry} %impaginazione e margini documento (symmetric: same margins on every page, no verso/recto shift)
+\usepackage[a4paper,top=2.5cm,bottom=2.5cm,inner=3cm,outer=2.5cm]{geometry} %dept guide: 3 cm inner (binding), 2.5 cm top/outer/bottom
 \usepackage{graphicx, wrapfig} %gestione immagini e grafiche
+\usepackage{subcaption} % pannelli (a)(b)(c)(d) in un'unica figura
+\usepackage{changepage} % allarga una singola figura oltre i margini (\begin{adjustwidth})
 \usepackage{array} % Column-type modifiers (>{\raggedright\arraybackslash}p{...}) for appendix tables
 \graphicspath{{images/}}
 \usepackage{amsmath, amsfonts}  % Math and blackboard-bold (\mathbb)
@@ -11,6 +20,7 @@
 \usepackage{longtable}  % Per le tabelle che si dividono su più pagine
 \usepackage{pdflscape} % Per girare le pagine in orizzontale
 \usepackage{float}           % For figure placement control
+\usepackage[font=small,labelfont=bf]{caption} % Captions one step smaller than body (11pt), bold label
 \usepackage{tikz}        % In-chapter schematics (Chapter 2 pipeline figure)
 \usetikzlibrary{positioning,arrows.meta}
 \usepackage[hidelinks,backref=page]{hyperref}  % \url{} plus "Cited on page(s)" back-links in the bibliography
@@ -25,7 +35,7 @@
 \usepackage[hang,bottom]{footmisc} % Footnotes: hanging indent, no rule line, flush to page bottom
 % Footnote styling: no rule line, smaller text, inset from main-text margin, hanging indentation
 \renewcommand{\footnoterule}{}                        % no separator line between text and footnote
-\renewcommand{\footnotesize}{\fontsize{10}{12}\selectfont}  % standard footnote size: 10pt for a ~12-13pt body
+\renewcommand{\footnotesize}{\fontsize{9}{11}\selectfont}  % standard footnote size: 9pt for an 11pt body
 \begingroup\footnotesize\setlength{\footnotemargin}{2em}\endgroup  % footnotes inset from text margin (measured at footnote size)
 \setlength{\footnotesep}{8.4pt}  % standard inter-footnote gap (bk12 default)
 \setlist{topsep=0.6em, partopsep=0pt, itemsep=0.15em, parsep=0pt}  % Lists match paragraph rhythm
