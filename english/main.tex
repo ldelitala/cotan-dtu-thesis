@@ -7,6 +7,16 @@
 \renewcommand\ps@plain{\let\@mkboth\@gobbletwo
   \let\@oddhead\@empty\let\@evenhead\@empty
   \def\@oddfoot{\hfil\small\thepage\hfil}\let\@evenfoot\@oddfoot}
+% Blank versos inserted by \cleardoublepage stay truly empty (no folio printed):
+% the base definition gives them the current (plain) page style, so they show a number.
+\renewcommand{\cleardoublepage}{%
+  \clearpage
+  \if@twoside
+    \ifodd\c@page\else
+      \hbox{}\thispagestyle{empty}\newpage
+      \if@twocolumn\hbox{}\newpage\fi
+    \fi
+  \fi}
 \makeatother
 % Body size set by \documentclass (11pt); footnotes set to 9pt below = standard convention
 \usepackage[a4paper,top=2.5cm,bottom=2.5cm,inner=3cm,outer=2.5cm]{geometry} %dept guide: 3 cm inner (binding), 2.5 cm top/outer/bottom
@@ -63,6 +73,7 @@
 \frontmatter
 % Title page
 \input{chapters/frontespizio}
+\input{chapters/00-acknowledgements}
 \input{chapters/00-abstract}
 % Table of contents (front matter, after the abstract)
 \tableofcontents
