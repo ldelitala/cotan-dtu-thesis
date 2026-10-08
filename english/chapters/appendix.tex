@@ -4,29 +4,24 @@
 The tables below list every reported event. The same data are available as CSV in the public repository, so a reader can re-derive or re-filter them.
 
 % --- TABELLA 3: DING ESCLUSIVI TRANSCRIPT ---
+\vspace*{\fill}
 \begingroup
 \scriptsize
 \setlength{\tabcolsep}{3pt}
-\begin{longtable}{@{} l p{2.6cm} p{2.6cm} >{\raggedright\arraybackslash}p{1.6cm} >{\raggedright\arraybackslash}p{1.6cm} r r r r @{}}
-\caption{DTU events exclusive to transcript-level clustering (Ding dataset).\label{tab:exc1_landscape}}\\
+\centering
+\captionof{table}{DTU events exclusive to transcript-level clustering (Ding dataset).\label{tab:exc1_landscape}}
+\begin{tabular}{@{} l p{2.6cm} p{2.6cm} >{\raggedright\arraybackslash}p{1.6cm} >{\raggedright\arraybackslash}p{1.6cm} r r r r @{}}
 \toprule
 \textbf{Gene} & \textbf{Tr.~A} & \textbf{Tr.~B} & \textbf{Clusters A} & \textbf{Clusters B} & \textbf{$\Delta$ A} & \textbf{$\Delta$ B} & \textbf{COEX} & \textbf{$p$-value} \\
 \midrule
-\endfirsthead
-\toprule
-\textbf{Gene} & \textbf{Tr.~A} & \textbf{Tr.~B} & \textbf{Clusters A} & \textbf{Clusters B} & \textbf{$\Delta$ A} & \textbf{$\Delta$ B} & \textbf{COEX} & \textbf{$p$-value} \\
-\midrule
-\endhead
-\midrule
-\multicolumn{9}{r}{\textit{Continued on next page}} \\
-\endfoot
-\bottomrule
-\endlastfoot
 Srrm2   & ENSMUST00000088621 & ENSMUST00000186961 & 10 & 09, 11 & 0.25 & 0.10 & $-0.059$ & $1.53 \times 10^{-04}$ \\
 Srrm2   & ENSMUST00000088621 & ENSMUST00000233636 & 10 & 09, 11 & 0.26 & 0.12 & $-0.059$ & $1.78 \times 10^{-04}$ \\
 Grin2b  & ENSMUST00000053880 & ENSMUST00000125905 & 11 & 04 & 0.10 & 0.10 & $-0.033$ & $3.39 \times 10^{-02}$ \\
 \multicolumn{9}{l}{\textit{No events are exclusive to gene-level clustering at $\tau = 0.09$: the gene-derived candidate set is a strict subset of the transcript-derived one.}} \\
-\end{longtable}
+\bottomrule
+\end{tabular}
+\endgroup
+\vspace*{\fill}
 % --- TABELLA 1: ARRIGONI ---
 \begin{landscape}
 \begingroup
@@ -136,4 +131,3 @@ Meg3    & ENSMUST00000246047 & ENSMUST00000247335 & 04 & 11 & 0.35 & 0.24 & $-0.
 \end{landscape}
 
 
-\endgroup
