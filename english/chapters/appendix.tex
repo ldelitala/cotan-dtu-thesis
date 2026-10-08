@@ -52,9 +52,9 @@ TPM1   & ENST00000317516 & ENST00000358278 & DV90, HCC78, HTB178 & A549, CCL-185
 % --- TABELLA 2: DING CONDIVISI ---
 \begin{landscape}
 \begingroup
-\footnotesize
-\setlength{\tabcolsep}{4.5pt}
-\begin{longtable}{@{} l l l >{\raggedright\arraybackslash}p{3.4cm} >{\raggedright\arraybackslash}p{3.4cm} r r r r @{}}
+\scriptsize
+\setlength{\tabcolsep}{3pt}
+\begin{longtable}{@{} l l l >{\raggedright\arraybackslash}p{4.4cm} >{\raggedright\arraybackslash}p{4.4cm} r r r r @{}}
 \caption{Shared DTU events detected by both clustering methods (Ding dataset), including cell types and contrasts.\label{tab:shared_landscape}}\\
 \toprule
 \textbf{Gene} & \textbf{Tr.~A} & \textbf{Tr.~B} & \textbf{Clusters A} & \textbf{Clusters B} & \textbf{$\Delta$ A} & \textbf{$\Delta$ B} & \textbf{COEX} & \textbf{$p$-value} \\
@@ -113,11 +113,10 @@ Meg3    & ENSMUST00000246047 & ENSMUST00000247335 & 04 & 11 & 0.35 & 0.24 & $-0.
 
 
 % --- TABELLA 3: DING ESCLUSIVI TRANSCRIPT ---
-\begin{landscape}
 \begingroup
-\footnotesize
-\setlength{\tabcolsep}{4.5pt}
-\begin{longtable}{@{} l l l >{\raggedright\arraybackslash}p{3.4cm} >{\raggedright\arraybackslash}p{3.4cm} r r r r @{}}
+\scriptsize
+\setlength{\tabcolsep}{3pt}
+\begin{longtable}{@{} l p{2.6cm} p{2.6cm} >{\raggedright\arraybackslash}p{1.6cm} >{\raggedright\arraybackslash}p{1.6cm} r r r r @{}}
 \caption{DTU events exclusive to transcript-level clustering (Ding dataset).\label{tab:exc1_landscape}}\\
 \toprule
 \textbf{Gene} & \textbf{Tr.~A} & \textbf{Tr.~B} & \textbf{Clusters A} & \textbf{Clusters B} & \textbf{$\Delta$ A} & \textbf{$\Delta$ B} & \textbf{COEX} & \textbf{$p$-value} \\
@@ -135,32 +134,6 @@ Meg3    & ENSMUST00000246047 & ENSMUST00000247335 & 04 & 11 & 0.35 & 0.24 & $-0.
 Srrm2   & ENSMUST00000088621 & ENSMUST00000186961 & 10 & 09, 11 & 0.25 & 0.10 & $-0.059$ & $1.53 \times 10^{-04}$ \\
 Srrm2   & ENSMUST00000088621 & ENSMUST00000233636 & 10 & 09, 11 & 0.26 & 0.12 & $-0.059$ & $1.78 \times 10^{-04}$ \\
 Grin2b  & ENSMUST00000053880 & ENSMUST00000125905 & 11 & 04 & 0.10 & 0.10 & $-0.033$ & $3.39 \times 10^{-02}$ \\
-\end{longtable}
-\endgroup
-\end{landscape}
-
-
-% --- TABELLA 4: DING ESCLUSIVI GENE ---
-\begin{landscape}
-\begingroup
-\footnotesize
-\setlength{\tabcolsep}{4.5pt}
-\begin{longtable}{@{} l l l >{\raggedright\arraybackslash}p{3.4cm} >{\raggedright\arraybackslash}p{3.4cm} r r r r @{}}
-\caption{DTU events exclusive to gene-level clustering (Ding dataset).\label{tab:exc2_landscape}}\\
-\toprule
-\textbf{Gene} & \textbf{Tr.~A} & \textbf{Tr.~B} & \textbf{Clusters A} & \textbf{Clusters B} & \textbf{$\Delta$ A} & \textbf{$\Delta$ B} & \textbf{COEX} & \textbf{$p$-value} \\
-\midrule
-\endfirsthead
-\toprule
-\textbf{Gene} & \textbf{Tr.~A} & \textbf{Tr.~B} & \textbf{Clusters A} & \textbf{Clusters B} & \textbf{$\Delta$ A} & \textbf{$\Delta$ B} & \textbf{COEX} & \textbf{$p$-value} \\
-\midrule
-\endhead
-\midrule
-\multicolumn{9}{r}{\textit{Continued on next page}} \\
-\endfoot
-\bottomrule
-\endlastfoot
 \multicolumn{9}{l}{\textit{No events are exclusive to gene-level clustering at $\tau = 0.09$: the gene-derived candidate set is a strict subset of the transcript-derived one.}} \\
 \end{longtable}
 \endgroup
-\end{landscape}
