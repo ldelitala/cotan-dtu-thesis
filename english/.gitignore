@@ -6,6 +6,7 @@
 *.fls
 *.blg
 *.bbl
+*.brf
 build/
 main.synctex.gz
 .overleaf/

@@ -61,6 +61,8 @@ Each half is implemented by a separate piece of code. The first half is driven b
 \end{figure}
 \endgroup
 
+Table~\ref{tab:toolchain} records the tools and versions used in both halves, each with the section that justifies its choice.
+
 \begin{table}[htbp]
     \caption{Tools used in this thesis: role, version, and the section justifying each choice.}\label{tab:toolchain}
     \vspace{0.5em}
@@ -146,7 +148,7 @@ Standard alevin-fry\cite{he2022alevin} output collapses to gene level by default
 # Modified: ENSMUST00000193814  ENSMUST00000193814  # itself
 \end{verbatim}}
 
-    \item \textbf{Removal of \texttt{gene\_id\_to\_name.tsv}}: the nf-core pipeline uses this file to map Ensembl gene identifiers to gene names during annotation. With the identity mapping in place the matrix rows are Ensembl \emph{transcript} identifiers, so the annotation step finds no gene IDs to match and halts. Removing \texttt{gene\_id\_to\_name.tsv} from the index trips a safety guard in alevin-fry: the annotation step checks for the file's presence and, finding it absent, skips the step. The guard does not itself know that annotation would halt on transcript IDs; we do, and we remove the file precisely to prevent that halt. The transcript counts were already written to disk, so they are kept and carried into the analysis.
+    \item \textbf{Removal of \texttt{gene\_id\_to\_name.tsv}}: the nf-core pipeline uses this file to map Ensembl gene identifiers to gene names during annotation. With the identity mapping in place the matrix rows are Ensembl \emph{transcript} identifiers, so the annotation step finds no gene IDs to match and halts. Removing \texttt{gene\_id\_to\_name.tsv} from the index trips a safety guard in alevin-fry: the annotation step checks for the file's presence and, finding it absent, skips the step. The guard does not itself know that annotation would halt on transcript IDs; the removal is deliberate, and it prevents that halt. The transcript counts were already written to disk, so they are kept and carried into the analysis.
 \end{enumerate}
 
 This modification is \textbf{reversible}: transcript-level quantification is a finer partition of the gene-level signal, so summing the transcript rows by gene using the retained \texttt{t2g} and \texttt{gene\_id\_to\_name} tables recovers a gene-level matrix directly, without rebuilding the index or re-aligning. This transcript-level route is an unsupported workaround, since alevin-fry is built for gene-level collapse and the identity-mapping modification is not an official mode. The gene-level matrix recovered by summing the transcript rows therefore matches a native gene-level run, except where the two resolutions assign ambiguous reads differently.
