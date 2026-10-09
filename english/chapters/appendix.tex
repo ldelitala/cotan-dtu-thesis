@@ -1,10 +1,12 @@
 \chapter{Supplementary Data}
+\thispagestyle{empty}
 \section{Complete DTU Results (Arigoni and Ding Datasets)}
 
 The tables below list every reported event. The same data are available as CSV in the public repository, so a reader can re-derive or re-filter them.
 
+\pagestyle{empty}
+
 % --- TABELLA 3: DING ESCLUSIVI TRANSCRIPT ---
-\vspace*{\fill}
 \begingroup
 \scriptsize
 \setlength{\tabcolsep}{3pt}
@@ -21,13 +23,12 @@ Grin2b  & ENSMUST00000053880 & ENSMUST00000125905 & 11 & 04 & 0.10 & 0.10 & $-0.
 \bottomrule
 \end{tabular}
 \endgroup
-\vspace*{\fill}
 % --- TABELLA 1: ARRIGONI ---
 \begin{landscape}
 \begingroup
-\footnotesize
-\setlength{\tabcolsep}{4.5pt}
-\begin{longtable}{@{} l l l >{\raggedright\arraybackslash}p{3.4cm} >{\raggedright\arraybackslash}p{3.4cm} r r r r @{}}
+\small
+\setlength{\tabcolsep}{4pt}
+\begin{longtable}{@{} l l l >{\raggedright\arraybackslash}p{4.6cm} >{\raggedright\arraybackslash}p{4.6cm} r r r r @{}}
 \caption{Significant DTU events in the human dataset (Arigoni 2024), including cluster enrichment and maximum contrasts.\label{tab:arrigoni_landscape}}\\
 \toprule
 \textbf{Gene} & \textbf{Tr.~A} & \textbf{Tr.~B} & \textbf{Clusters A} & \textbf{Clusters B} & \textbf{$\Delta$ A} & \textbf{$\Delta$ B} & \textbf{COEX} & \textbf{$p$-value} \\
@@ -73,7 +74,7 @@ TPM1   & ENST00000317516 & ENST00000358278 & DV90, HCC78, HTB178 & A549, CCL-185
 \begingroup
 \scriptsize
 \setlength{\tabcolsep}{3pt}
-\begin{longtable}{@{} l l l >{\raggedright\arraybackslash}p{4.4cm} >{\raggedright\arraybackslash}p{4.4cm} r r r r @{}}
+\begin{longtable}{@{} l l l >{\raggedright\arraybackslash}p{4.2cm} >{\raggedright\arraybackslash}p{4.2cm} r r r r @{}}
 \caption{Shared DTU events detected by both clustering methods (Ding dataset), including cell types and contrasts.\label{tab:shared_landscape}}\\
 \toprule
 \textbf{Gene} & \textbf{Tr.~A} & \textbf{Tr.~B} & \textbf{Clusters A} & \textbf{Clusters B} & \textbf{$\Delta$ A} & \textbf{$\Delta$ B} & \textbf{COEX} & \textbf{$p$-value} \\
