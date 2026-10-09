@@ -17,8 +17,8 @@ echo "Building PDF..."
 mkdir -p build
 log=build/build.log
 if latexmk -pdf -synctex=1 -interaction=nonstopmode -file-line-error \
-        -outdir=. -auxdir=./build main.tex >"$log" 2>&1; then
-    echo "✅ Built: main.pdf ($(ls -lh main.pdf | awk '{print $5}'))"
+        -outdir=. -auxdir=./build main.tex >"$log" && mv -f main.pdf cotan-dtu-thesis.pdf 2>&1; then
+    echo "✅ Built: cotan-dtu-thesis.pdf ($(ls -lh cotan-dtu-thesis.pdf | awk '{print $5}'))"
 else
     echo "❌ Build failed. Errors (full log: $log):"
     grep -nE ':[0-9]+:|^!' "$log" | head -30 || true
