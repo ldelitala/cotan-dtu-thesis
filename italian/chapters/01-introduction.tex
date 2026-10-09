@@ -51,16 +51,3 @@ Consequently, the field lacks a sparsity-robust statistical framework capable of
 This thesis is born as a direct consequence of the recent publication of the COTAN (Co-expression Tables Analysis) framework. Designed specifically to handle extreme sparsity, COTAN demonstrated superior performance compared to other frameworks on highly sparse gene-level matrices. This success raised a natural question: could it work even better—or at least adequately—on transcript-level matrices, which are inherently sparser than their gene-level counterparts?
 
 COTAN is adapted in this work to operate at transcript resolution rather than its traditional gene-level application. The practical consequence is straightforward: by avoiding artificial imputation and bypassing gene-level or pseudo-bulk aggregation, the approach preserves cell-to-cell heterogeneity that standard pipelines discard. However, it does not solve the positional bias problem itself—transcripts with identical 3' ends remain indistinguishable. The adaptation instead asks a more modest question: can COTAN detect DTU on the subset of transcripts where isoform differences are evident at the 3' end? Even this constrained scope represents meaningful progress, as it demonstrates whether sparsity-robust statistical pathways exist for detecting isoform switches in large-scale droplet-based datasets without full-length sequencing costs.
-
-\section{Thesis Outline}
-The remainder of this thesis is organized as follows:
-
-\begin{itemize}
-    \item \textbf{Chapter 2: Background and Fundamentals.} Establishes theoretical foundations for transcript-level analysis in single-cell data. Covers pseudo-alignment algorithms, the Expectation-Maximization algorithm for resolving multi-mapping reads, mathematical properties of matrix sparsity, limitations of traditional statistical approaches, prior DTU detection work in bulk RNA-seq, and contingency table statistics underlying COTAN.
-    
-    \item \textbf{Chapter 3: Methods.} Details the reproducible methodology used throughout this thesis. Describes the custom computational pipeline for constructing transcript-level count matrices from raw sequencing data using alevin-fry, dataset selection criteria (human and mouse scRNA-seq datasets with known cell type annotations), and the step-by-step DTU detection algorithm adapted from COTAN's framework.
-    
-    \item \textbf{Chapter 4: Results and Discussion.} Evaluates empirical performance across multiple dimensions. Presents clustering quality assessments using the Global Differentiation Index, identifies candidate transcripts showing differential usage patterns between cell types in both human and mouse datasets, and discusses biological interpretations alongside methodological limitations.
-    
-    \item \textbf{Chapter 5: Conclusion.} Summarizes main contributions, evaluates whether adapting COTAN for transcript-level analysis successfully addresses DTU detection in sparse single-cell data, and outlines computational extensions for future work including scalability improvements and integration with spatial transcriptomics.
-\end{itemize}

@@ -61,7 +61,7 @@ Due pseudo-allineatori dominano la quantificazione trascrittomica a singola cell
         Gestione dei multi-mapping & Distribuzione uniforme & Assegnazione basata su EM \\
         Accuratezza della deduplicazione UMI & Buona & Migliore (modellazione degli errori) \\
         Velocità & Rapida ($\sim$10 min per campione) & Molto rapida ($\sim$5 min per campione) \\
-        Integrazione con nf-core & Disponibile ma meno comune & Supporto nativo dalla v4.2+ \\
+        Integrazione con nf-core & Disponibile ma meno comune & Supporto nativo dalla v4.1.0 \\
         \bottomrule
     \end{tabular}
 \end{table}
@@ -71,7 +71,7 @@ La scelta è ricaduta su alevin-fry (modalità \texttt{simpleaf}, parte di Salmo
 \begin{enumerate}
     \item \textbf{Gestione superiore degli UMI}: i dati a singola cellula usano gli Unique Molecular Identifier per correggere il bias di amplificazione PCR. Il modello di errore di alevin-fry distingue meglio gli UMI reali dagli errori di sequenziamento.
     \item \textbf{Risoluzione dei multi-mapping}: i read compatibili con più trascritti vengono assegnati in modo probabilistico tramite Expectation-Maximization (EM), anziché ripartiti uniformemente. Questo preserva i segnali di abbondanza relativa per l'analisi a valle.
-    \item \textbf{Integrazione con nf-core}\defn{nf-core}{Un repository comunitario di pipeline di analisi Nextflow standardizzate e revisionate tra pari.}: la pipeline nf-core/scrnaseq (v4.2.0) supporta nativamente \texttt{simpleaf}, con meno complicazioni di configurazione rispetto alle alternative con kallisto.
+    \item \textbf{Integrazione con nf-core}\defn{nf-core}{Un repository comunitario di pipeline di analisi Nextflow standardizzate e revisionate tra pari.}: la pipeline nf-core/scrnaseq (v4.1.0) supporta nativamente \texttt{simpleaf}, con meno complicazioni di configurazione rispetto alle alternative con kallisto.
 \end{enumerate}
 
 La scelta dell'algoritmo EM conta: è stata usata la modalità \texttt{parsimony-em}\defn{parsimony-em}{Una modalità EM che assegna ogni read multi-mappato al più piccolo insieme sufficiente di trascritti.}, che assegna i read multi-mappati all'insieme minimo di trascritti coerente con i dati osservati. Questo produce conteggi frazionari che devono essere arrotondati (si veda la Sezione~\ref{sec:modification-process}).
@@ -97,7 +97,7 @@ Questa modifica è \textbf{reversibile}: ripristinando i file di indice standard
 
 \subsection*{Pipeline Nextflow personalizzata}
 
-Per rendere questo workflow riproducibile su dataset diversi, esso è stato automatizzato con \textbf{Nextflow}, un linguaggio domain-specific per pipeline computazionali che gestisce parallelizzazione e checkpointing. È stata incapsulata nf-core/scrnaseq (v4.2.0), una pipeline di analisi scRNA-seq mantenuta dalla comunità con supporto integrato per Salmon/simpleaf. Questa scelta fornisce gestione degli errori, dipendenze containerizzate e configurazione standard su tutti i dataset.
+Per rendere questo workflow riproducibile su dataset diversi, esso è stato automatizzato con \textbf{Nextflow}, un linguaggio domain-specific per pipeline computazionali che gestisce parallelizzazione e checkpointing. È stata incapsulata nf-core/scrnaseq (v4.1.0), una pipeline di analisi scRNA-seq mantenuta dalla comunità con supporto integrato per \texttt{simpleaf}. Questa scelta fornisce gestione degli errori, dipendenze containerizzate e configurazione standard su tutti i dataset.
 
 Lo script di automazione personalizzato:
 
@@ -108,7 +108,7 @@ Lo script di automazione personalizzato:
         \item Download dei file FASTQ tramite \texttt{sra-tools}.
         \item Costruzione o riuso dell'indice del trascrittoma con \texttt{salmon}.
         \item Applicazione della modifica a \texttt{t2g.txt} se è richiesto l'output a livello di trascritto.
-        \item Esecuzione di nf-core/scrnaseq (v4.2.0) con \texttt{simpleaf}.
+        \item Esecuzione di nf-core/scrnaseq (v4.1.0) con \texttt{simpleaf}.
         \item Formattazione degli output per l'ingestione in COTAN (matrice e metadati).
     \end{enumerate}
 

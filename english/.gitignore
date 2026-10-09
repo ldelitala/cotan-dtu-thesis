@@ -7,6 +7,7 @@
 *.blg
 *.bbl
 *.brf
+*.toc
 build/
 main.synctex.gz
 .overleaf/

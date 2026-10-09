@@ -16,9 +16,23 @@ Questo lavoro ha implicazioni in tre ambiti:
 
 \textbf{Per lo sviluppo del framework COTAN}: questa tesi conferma che i principi di progettazione di COTAN---la modellazione diretta dei conteggi nulli e la calibrazione $\chi^2$ dei $p$-value su grandi $N$---si generalizzano oltre l'analisi a livello genico. Estensioni future ad altre modalità a singola cellula (co-occorrenza di picchi ATAC-seq\defn{ATAC-seq}{Assay for Transposase-Accessible Chromatin: mappa le regioni del genoma in cui la cromatina è aperta, indicando attività regolatoria.} e correlazioni di abbondanza proteica in CITE-seq\defn{CITE-seq}{Un protocollo che misura simultaneamente RNA e proteine di superficie nelle stesse singole cellule, abilitando l'analisi multi-modale.}) appaiono praticabili.
 
+\section{Ciò che questo lavoro lascia}
+
+Oltre ai risultati, questa tesi lascia un insieme di artefatti riutilizzabili, pubblicati insieme nel repository pubblico che la accompagna.
+
+\textbf{Una libreria di analisi.} Il pacchetto R \texttt{cotanisoform} raccoglie l'intero percorso di analisi in funzioni documentate: leggere una matrice di conteggi, adattarla a COTAN, eseguire i passi di COTAN, estrarre i candidati DTU e confrontare le esecuzioni. Può essere installato e usato su qualsiasi dataset a singola cellula, indipendentemente dai due dataset studiati qui, e il suo strato di logging permette a una lunga esecuzione di riportare il proprio avanzamento e i propri errori in un'unica traccia coerente.
+
+\textbf{Una pipeline di quantificazione.} La pipeline Nextflow automatizza il percorso dai read grezzi a una matrice di conteggi, offrendo sia l'indice a livello genico sia quello a livello di trascritto e incapsulando il passo di quantificazione di nf-core. I suoi passi---download, index e align---si eseguono separatamente, così una nuova esecuzione a partire da un indice esistente non ripete il download.
+
+\textbf{Uno strato di analisi riproducibile.} Gli script driver riproducono l'analisi completa di un dataset da un unico file di configurazione, uno per dataset e livello di feature, così ogni tabella riportata può essere rigenerata senza input interattivo.
+
+\textbf{Documentazione e output di riferimento.} Il repository documenta il metodo, i parametri dietro ogni tabella pubblicata e uno script di parità che ri-deriva le tabelle DTU riportate dagli oggetti salvati, così un lettore può verificare i risultati anziché fidarsi.
+
 \section{Limiti e lavoro futuro}
 
 I vincoli su questi risultati---invisibilità dovuta al bias $3'$, assenza di validazione ortogonale, soglia euristica $\tau$ e arrotondamento dell'EM---sono esposti insieme alle direzioni che aprono nella Sezione~\ref{sec:discussion}. Lo stesso compromesso di fondo li governa tutti e quattro: la sensibilità si compra con le cellule anziché con la copertura, quindi il valore del metodo cresce con i dataset.
+
+Sul piano computazionale, la pipeline e l'analisi restano due metà separate unite alla matrice di conteggi: il workflow Nextflow termina alla matrice filtrata, e l'analisi R viene avviata separatamente. Ripiegare l'analisi nel workflow come un ulteriore passo renderebbe una singola esecuzione capace di coprire il percorso dalle accessioni grezze ai candidati DTU, che è la principale direzione ingegneristica che questo lavoro lascia aperta.
 
 Un quantificatore più recente punta nella stessa direzione. SCALPEL\cite{ake2025scalpel} costruisce la matrice di trascritti da dati $3'$-based standard seguendo una via diversa dal passo EM usato qui, e i suoi autori riportano sensibilità superiore e un recupero più fedele delle reali proporzioni di isoforme rispetto agli strumenti esistenti, con validazione sperimentale. Sostituirlo a \texttt{parsimony-em} verificherebbe se le chiamate di DTU a valle diventano più nitide, il che lo rende un'estensione naturale di questo quadro.
 

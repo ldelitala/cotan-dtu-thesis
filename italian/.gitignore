@@ -6,6 +6,7 @@
 *.fls
 *.blg
 *.bbl
+*.toc
 build/
 main.pdf
 main.synctex.gz
