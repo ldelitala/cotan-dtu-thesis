@@ -9,7 +9,7 @@
 *.brf
 *.toc
 build/
-main.synctex.gz
+cotan-dtu-thesis.synctex.gz
 .overleaf/
 thesis_overleaf.zip
 
